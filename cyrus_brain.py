@@ -30,6 +30,7 @@ import threading
 import time
 import argparse
 import queue as _stdlib_queue
+import socket
 
 import comtypes
 import pyautogui
@@ -478,23 +479,19 @@ class ChatWatcher:
                 try:
                     vscode = auto.WindowControl(searchDepth=1, SubName=self._target_sub)
                     win_found = vscode.Exists(1)
-                    print(f"[DBG coords] proj={self.project_name!r} win_found={win_found} sub={self._target_sub!r}")
                     if win_found:
                         ctrl = vscode.EditControl(searchDepth=20, Name=_CHAT_INPUT_HINT)
-                        edit_found = ctrl.Exists(2)
-                        print(f"[DBG coords] EditControl('{_CHAT_INPUT_HINT}') found={edit_found}")
-                        if edit_found:
+                        if ctrl.Exists(2):
                             r = ctrl.BoundingRectangle
-                            print(f"[DBG coords] BoundingRect={r.left},{r.top},{r.right},{r.bottom}")
                             if r.width() > 0:
                                 _chat_input_coords[self.project_name] = (
                                     (r.left + r.right) // 2,
                                     (r.top + r.bottom) // 2,
                                 )
-                            print(f"[Brain] {label}Chat input coords cached: "
-                                  f"{_chat_input_coords.get(self.project_name)}")
+                                print(f"[Brain] {label}Chat input coords cached: "
+                                      f"{_chat_input_coords.get(self.project_name)}")
                 except Exception as e:
-                    print(f"[DBG coords] exception: {e}")
+                    print(f"[Brain] {label}Coords cache error: {e}")
 
             seed = ""
             for _ in range(6):
@@ -779,6 +776,20 @@ class PermissionWatcher:
 
         return perm_btn, perm_cmd, prompt_ctrl, prompt_label
 
+    def arm_from_hook(self, tool: str, cmd: str, loop: asyncio.AbstractEventLoop) -> None:
+        """Pre-arm from PreToolUse hook — announces before VS Code shows the dialog."""
+        if self._pending:
+            return  # already waiting for a response
+        self._allow_btn     = "keyboard"
+        self._pending       = True
+        self._pending_since = time.time()
+        self._announced     = f"hook:{cmd}"
+        prefix = f"In {self.project_name}: " if self.project_name else ""
+        prompt = f"{prefix}Allow command. Say yes or no."
+        print(f"\n[Permission/hook] {prefix}{tool}: {cmd}")
+        _send_threadsafe({"type": "stop_speech"}, loop)
+        asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
+
     def handle_response(self, text: str) -> bool:
         if not self._pending or not self._allow_btn:
             return False
@@ -866,18 +877,21 @@ class PermissionWatcher:
                         if qp_found:
                             btn, cmd = "keyboard", qp_cmd
 
-                    if btn and cmd != self._announced:
-                        self._allow_btn    = btn
-                        self._pending      = True
-                        self._pending_since = time.time()
-                        self._announced    = cmd
-                        prefix = f"In {self.project_name}: " if self.project_name else ""
-                        # Short prompt — faster TTS generation
-                        prompt = f"{prefix}Allow command. Say yes or no."
-                        print(f"\n[Permission] {prefix}Claude wants to run: {cmd}")
-                        # Stop current TTS immediately via threadsafe, then announce
-                        _send_threadsafe({"type": "stop_speech"}, loop)
-                        asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
+                    if btn:
+                        if not self._pending:
+                            # Fresh UIA detection — announce
+                            self._allow_btn     = btn
+                            self._pending       = True
+                            self._pending_since = time.time()
+                            self._announced     = cmd
+                            prefix = f"In {self.project_name}: " if self.project_name else ""
+                            prompt = f"{prefix}Allow command. Say yes or no."
+                            print(f"\n[Permission] {prefix}Claude wants to run: {cmd}")
+                            _send_threadsafe({"type": "stop_speech"}, loop)
+                            asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
+                        elif btn != "keyboard" and self._allow_btn == "keyboard":
+                            # Hook armed with keyboard fallback — upgrade to real UIA button
+                            self._allow_btn = btn
                     elif not btn:
                         self._announced = ""
                         # Keep pending for 20 s after announcement so transient
@@ -1058,9 +1072,73 @@ def _find_chat_input(target_subname: str = "") -> object:
     return min(found, key=lambda x: x[0])[1]
 
 
+def _open_companion_connection(safe: str) -> socket.socket:
+    """Open a socket to the Cyrus Companion extension for the given workspace.
+    Windows: TCP localhost, port read from %LOCALAPPDATA%\\cyrus\\companion-{safe}.port
+    Unix/Mac: AF_UNIX socket at /tmp/cyrus-companion-{safe}.sock
+    """
+    if os.name == 'nt':
+        base = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
+        port_file = os.path.join(base, 'cyrus', f'companion-{safe}.port')
+        port = int(open(port_file).read().strip())
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(('127.0.0.1', port))
+        return s
+    else:
+        import tempfile
+        sock_path = os.path.join(tempfile.gettempdir(), f'cyrus-companion-{safe}.sock')
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(sock_path)
+        return s
+
+
+def _submit_via_extension(text: str) -> bool:
+    """
+    Submit via the Cyrus Companion VS Code extension.
+    Windows: TCP localhost + discovery file (no AF_UNIX needed).
+    Unix/Mac: AF_UNIX domain socket.
+    Returns True on {"ok": true}, False on any failure (falls back to UIA).
+    """
+    with _active_project_lock:
+        proj = _active_project
+
+    safe = re.sub(r'[^\w\-]', '_', proj or "default")[:40]
+
+    try:
+        with _open_companion_connection(safe) as s:
+            s.sendall((json.dumps({"text": text}) + "\n").encode("utf-8"))
+            raw = b""
+            while b"\n" not in raw:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                raw += chunk
+            result = json.loads(raw.decode("utf-8").strip())
+            if result.get("ok"):
+                return True
+            print(f"[Brain] Extension error: {result.get('error')}")
+            return False
+    except FileNotFoundError:
+        # Discovery file or socket not found — extension not running
+        return False
+    except (ConnectionRefusedError, OSError) as e:
+        print(f"[Brain] Companion extension unavailable: {e}")
+        return False
+    except Exception as e:
+        print(f"[Brain] Companion extension error: {e}")
+        return False
+
+
 def _submit_to_vscode_impl(text: str) -> bool:
     """Runs on the dedicated submit thread. Uses pixel coords — no COM cross-thread issues."""
     global _vscode_win_cache
+
+    # ── 0. Try companion extension (no pixel coords, cross-platform) ──────────
+    if _submit_via_extension(text):
+        return True
+    print("[Brain] Companion extension unavailable — falling back to UIA")
 
     with _active_project_lock:
         proj = _active_project
@@ -1071,7 +1149,11 @@ def _submit_to_vscode_impl(text: str) -> bool:
     while proj not in _chat_input_coords and time.time() < deadline:
         time.sleep(0.3)
     coords = _chat_input_coords.get(proj)
-    print(f"[DBG submit] proj={proj!r} coords={coords} keys={list(_chat_input_coords.keys())}")
+
+    # Fallback: active project key may not match cached session — use any available coords
+    if not coords and _chat_input_coords:
+        fallback_proj, coords = next(iter(_chat_input_coords.items()))
+        print(f"[submit] active={proj!r} not in coords cache — using fallback from {fallback_proj!r}")
 
     if not coords:
         # Last-resort UIA search — no window activation yet
@@ -1351,32 +1433,63 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
                                   session_mgr: "SessionManager") -> None:
     """
     Accepts a single connection from cyrus_hook.py, reads one JSON message,
-    speaks the response, and suppresses ChatWatcher for that session so the
-    same text isn't spoken twice.
+    and dispatches on event type: stop / pre_tool / post_tool / notification.
     """
     try:
         raw = await asyncio.wait_for(reader.readline(), timeout=3.0)
         if not raw:
             return
-        msg  = json.loads(raw.decode().strip())
-        text = (msg.get("text") or "").strip()
-        cwd  = msg.get("cwd", "")
-        if not text:
-            return
+        msg   = json.loads(raw.decode().strip())
+        event = msg.get("event", "stop")
+        cwd   = msg.get("cwd", "")
+        proj  = _resolve_project_from_cwd(cwd, session_mgr)
+        loop  = asyncio.get_event_loop()
 
-        proj   = _resolve_project_from_cwd(cwd, session_mgr)
-        spoken = clean_for_speech(text)
+        if event == "stop":
+            text = (msg.get("text") or "").strip()
+            if not text:
+                return
+            spoken = clean_for_speech(text)
+            cw = session_mgr._chat_watchers.get(proj)
+            if cw:
+                cw._response_history.append(spoken)
+                cw._hook_spoken_until = time.time() + 30.0
+            preview = spoken[:80] + ("..." if len(spoken) > 80 else "")
+            print(f"\nCyrus [{proj or 'Claude'}] (hook): {preview}")
+            await _speak_queue.put((proj, spoken))
 
-        # Update response history in ChatWatcher
-        cw = session_mgr._chat_watchers.get(proj)
-        if cw:
-            cw._response_history.append(spoken)
-            # Suppression window: ChatWatcher skips TTS for this response
-            cw._hook_spoken_until = time.time() + 30.0
+        elif event == "pre_tool":
+            tool = msg.get("tool", "")
+            cmd  = msg.get("command", "")
+            pw   = (session_mgr._perm_watchers.get(proj) or
+                    next(iter(session_mgr._perm_watchers.values()), None))
+            if pw:
+                pw.arm_from_hook(tool, cmd, loop)
 
-        preview = spoken[:80] + ("..." if len(spoken) > 80 else "")
-        print(f"\nCyrus [{proj or 'Claude'}] (hook): {preview}")
-        await _speak_queue.put((proj, spoken))
+        elif event == "post_tool":
+            tool   = msg.get("tool", "")
+            prefix = f"In {proj}: " if proj else ""
+            if tool == "Bash":
+                exit_code = msg.get("exit_code", 0)
+                if exit_code != 0:
+                    spoken = f"{prefix}Command failed with exit code {exit_code}."
+                    print(f"\n[PostTool] {spoken}")
+                    await _speak_urgent(spoken)
+            elif tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+                file_path = msg.get("file_path", "")
+                basename  = os.path.basename(file_path) if file_path else "a file"
+                verb      = "wrote" if tool == "Write" else "edited"
+                spoken    = f"{prefix}Claude {verb} {basename}."
+                print(f"\n[PostTool] {spoken}")
+                await _speak_queue.put(("", spoken))
+
+        elif event == "notification":
+            message = (msg.get("message") or "").strip()
+            if message:
+                prefix = f"In {proj}: " if proj else ""
+                spoken = f"{prefix}{message}"
+                print(f"\n[Notification] {spoken}")
+                await _speak_urgent(spoken)
 
     except asyncio.TimeoutError:
         pass
