@@ -46,7 +46,7 @@ BRAIN_PORT       = 8766
 HOOK_PORT        = 8767   # Claude Code Stop hook sends here
 VSCODE_TITLE     = "Visual Studio Code"
 _CHAT_INPUT_HINT = "Message input"
-MAX_SPEECH_WORDS = 30
+MAX_SPEECH_WORDS = 50
 
 WAKE_WORDS = {"cyrus", "sire", "sirius", "serious", "cyprus",
               "virus", "sirus", "cirus", "sy", "sir", "sarush", "surus",
