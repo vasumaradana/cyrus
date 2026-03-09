@@ -169,8 +169,11 @@ async def _send(msg: dict) -> None:
         except Exception:
             _voice_writer = None
     # Broadcast to mobile WebSocket clients
-    if _mobile_clients and msg.get("type") == "speak":
-        payload = json.dumps(msg)
+    if _mobile_clients and msg.get("type") in ("speak", "prompt", "thinking", "tool"):
+        mobile_msg = dict(msg)
+        if "full_text" in mobile_msg:
+            mobile_msg["text"] = mobile_msg.pop("full_text")
+        payload = json.dumps(mobile_msg)
         dead = set()
         for ws in _mobile_clients.copy():
             try:
@@ -190,8 +193,13 @@ def _send_threadsafe(msg: dict, loop: asyncio.AbstractEventLoop) -> None:
 async def _speak_worker() -> None:
     """Consume speak queue and forward to voice."""
     while True:
-        project, text = await _speak_queue.get()
-        await _send({"type": "speak", "text": text, "project": project})
+        item = await _speak_queue.get()
+        project, text = item[0], item[1]
+        full_text = item[2] if len(item) > 2 else None
+        msg = {"type": "speak", "text": text, "project": project}
+        if full_text:
+            msg["full_text"] = full_text
+        await _send(msg)
 
 
 async def _speak_urgent(text: str) -> None:
@@ -561,7 +569,7 @@ class ChatWatcher:
 
                             if is_active_fn():
                                 asyncio.run_coroutine_threadsafe(
-                                    _speak_queue.put((self.project_name, spoken)), loop
+                                    _speak_queue.put((self.project_name, spoken, response)), loop
                                 )
                             else:
                                 self._pending_queue.append(spoken)
@@ -800,7 +808,8 @@ class PermissionWatcher:
         self._pending_since = time.time()
         self._announced     = f"hook:{cmd}"
         prefix = f"In {self.project_name}: " if self.project_name else ""
-        prompt = f"{prefix}Allow command. Say yes or no."
+        cmd_short = cmd[:120] if cmd else tool
+        prompt = f"{prefix}Allow {tool}: {cmd_short}. Say yes or no."
         print(f"\n[Permission/hook] {prefix}{tool}: {cmd}")
         _send_threadsafe({"type": "stop_speech"}, loop)
         asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
@@ -900,7 +909,8 @@ class PermissionWatcher:
                             self._pending_since = time.time()
                             self._announced     = cmd
                             prefix = f"In {self.project_name}: " if self.project_name else ""
-                            prompt = f"{prefix}Allow command. Say yes or no."
+                            cmd_short = cmd[:120] if cmd else ""
+                            prompt = f"{prefix}Allow: {cmd_short}. Say yes or no."
                             print(f"\n[Permission] {prefix}Claude wants to run: {cmd}")
                             _send_threadsafe({"type": "stop_speech"}, loop)
                             asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
@@ -1453,6 +1463,8 @@ async def routing_loop(session_mgr: SessionManager,
                 print("→ Could not find VS Code window.\n")
             else:
                 await _send({"type": "chime"})
+                await _send({"type": "prompt", "text": raw_msg, "project": proj or ""})
+                await _send({"type": "thinking"})
             _conversation_active = False
 
 
@@ -1499,12 +1511,13 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
                 cw._hook_spoken_until = time.time() + 30.0
             preview = spoken[:80] + ("..." if len(spoken) > 80 else "")
             print(f"\nCyrus [{proj or 'Claude'}] (hook): {preview}")
-            await _speak_queue.put((proj, spoken))
+            await _speak_queue.put((proj, spoken, text))
 
         elif event == "pre_tool":
             tool = msg.get("tool", "")
             cmd  = msg.get("command", "")
             print(f"[pre_tool] Received: tool={tool}, proj={proj!r}, cmd={cmd[:60]}")
+            await _send({"type": "tool", "tool": tool, "command": cmd})
             pw   = (session_mgr._perm_watchers.get(proj) or
                     next(iter(session_mgr._perm_watchers.values()), None))
             if pw:
