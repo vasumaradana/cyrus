@@ -22,7 +22,66 @@ Two services, independently deployable:
 
 ## Quick Start (Developer)
 
-Clone the repo and run both services:
+**Prerequisites:** Python 3.10+, Node.js 18+, VS Code with the Claude Code extension installed.
+CUDA GPU recommended for Whisper (falls back to CPU).
+
+### 1. Clone and create a virtual environment
+
+```bash
+git clone https://github.com/user/cyrus.git
+cd cyrus
+
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in your keys (e.g. `ANTHROPIC_API_KEY`).
+
+### 3. Build and install the VS Code companion extension
+
+```bash
+cd cyrus-companion
+npm install
+npm run compile
+npx @vscode/vsce package --no-dependencies
+code --install-extension cyrus-companion-*.vsix --force
+cd ..
+```
+
+Restart VS Code after installing.
+
+### 4. Configure Claude Code hooks
+
+Add all 4 hook events to `~/.claude/settings.json`. Use the **venv Python** and the absolute path to `cyrus_hook.py`:
+
+```json
+{
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command", "command": "/absolute/path/.venv/bin/python /absolute/path/cyrus_hook.py", "timeout": 5 }] }],
+    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "/absolute/path/.venv/bin/python /absolute/path/cyrus_hook.py", "timeout": 5 }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "/absolute/path/.venv/bin/python /absolute/path/cyrus_hook.py", "timeout": 5 }] }],
+    "Notification": [{ "hooks": [{ "type": "command", "command": "/absolute/path/.venv/bin/python /absolute/path/cyrus_hook.py", "timeout": 5 }] }]
+  }
+}
+```
+
+Replace `/absolute/path/` with the actual path to your repo.
+Use forward slashes, even on Windows (e.g. `C:/source/cyrus/.venv/Scripts/python.exe C:/source/cyrus/cyrus_hook.py`).
+
+### 5. Run both services
 
 ```bash
 # Terminal 1 — Brain (on the machine with VS Code)
@@ -54,11 +113,12 @@ cd cyrus-brain
 bash install-brain.sh
 ```
 
-This will:
-- Install Python dependencies in a virtual environment
-- Install the VS Code companion extension
-- Configure all 4 Claude Code hooks (Stop, PreToolUse, PostToolUse, Notification)
-- Create `start-brain.bat` / `start-brain.sh` launch script
+The installer handles everything automatically:
+- Creates a Python virtual environment and installs dependencies
+- Installs the VS Code companion extension
+- Configures all 4 Claude Code hooks in `~/.claude/settings.json` (Stop, PreToolUse, PostToolUse, Notification)
+- Backs up any existing `settings.json` to `settings.json.bak`
+- Creates `start-brain.bat` / `start-brain.sh` launch script
 
 **After install, restart VS Code.**
 
