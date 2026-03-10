@@ -25,7 +25,7 @@ Copy-Item "$ScriptDir\cyrus_voice.py" "$InstallDir\" -Force
 Copy-Item "$ScriptDir\requirements-voice.txt" "$InstallDir\" -Force
 
 # Copy or download Kokoro TTS model files
-$HfBase = "https://huggingface.co/thewh1teagle/kokoro-onnx/resolve/main"
+$HfBase = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 if (Test-Path "$ScriptDir\kokoro-v1.0.onnx") {
     Write-Host "       Copying Kokoro TTS model..."
     Copy-Item "$ScriptDir\kokoro-v1.0.onnx" "$InstallDir\" -Force

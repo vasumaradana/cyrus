@@ -36,7 +36,7 @@ cp "$SCRIPT_DIR/cyrus_voice.py" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/requirements-voice.txt" "$INSTALL_DIR/"
 
 # Copy or download Kokoro TTS model files
-HF_BASE="https://huggingface.co/thewh1teagle/kokoro-onnx/resolve/main"
+HF_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 if [ -f "$SCRIPT_DIR/kokoro-v1.0.onnx" ]; then
     echo "       Copying Kokoro TTS model..."
     cp "$SCRIPT_DIR/kokoro-v1.0.onnx" "$INSTALL_DIR/"

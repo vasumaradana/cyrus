@@ -31,7 +31,7 @@ Pop-Location
 # ── Download Kokoro TTS models if not present ────────────────────────────────
 $KokoroModel  = "$ScriptDir\kokoro-v1.0.onnx"
 $KokoroVoices = "$ScriptDir\voices-v1.0.bin"
-$HfBase = "https://huggingface.co/thewh1teagle/kokoro-onnx/resolve/main"
+$HfBase = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 
 if (-not (Test-Path $KokoroModel)) {
     Write-Host "[1.5/3] Downloading Kokoro TTS model (~370 MB)..."
