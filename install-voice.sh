@@ -35,13 +35,20 @@ echo "[2/4] Copying voice files..."
 cp "$SCRIPT_DIR/cyrus_voice.py" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/requirements-voice.txt" "$INSTALL_DIR/"
 
-# Copy Kokoro model files if present (optional TTS)
+# Copy or download Kokoro TTS model files
+HF_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 if [ -f "$SCRIPT_DIR/kokoro-v1.0.onnx" ]; then
-    echo "       Copying Kokoro TTS model (this may take a moment)..."
+    echo "       Copying Kokoro TTS model..."
     cp "$SCRIPT_DIR/kokoro-v1.0.onnx" "$INSTALL_DIR/"
+elif [ ! -f "$INSTALL_DIR/kokoro-v1.0.onnx" ]; then
+    echo "       Downloading Kokoro TTS model (~370 MB)..."
+    curl -L -o "$INSTALL_DIR/kokoro-v1.0.onnx" "$HF_BASE/kokoro-v1.0.onnx"
 fi
 if [ -f "$SCRIPT_DIR/voices-v1.0.bin" ]; then
     cp "$SCRIPT_DIR/voices-v1.0.bin" "$INSTALL_DIR/"
+elif [ ! -f "$INSTALL_DIR/voices-v1.0.bin" ]; then
+    echo "       Downloading Kokoro voices (~4 MB)..."
+    curl -L -o "$INSTALL_DIR/voices-v1.0.bin" "$HF_BASE/voices-v1.0.bin"
 fi
 
 # 3. Create virtual environment and install dependencies

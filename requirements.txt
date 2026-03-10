@@ -7,7 +7,7 @@ edge-tts
 kokoro-onnx[gpu]
 onnxruntime-gpu
 keyboard
-pygame
+pygame-ce
 pyautogui
 pyperclip
 pygetwindow

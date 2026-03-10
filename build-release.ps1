@@ -22,9 +22,25 @@ New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 # ── Build companion extension ─────────────────────────────────────────────────
 Write-Host "`n[1/3] Building companion extension..."
 Push-Location "$ScriptDir\cyrus-companion"
+$ErrorActionPreference = "Continue"
 npm run compile 2>&1 | Out-Null
 npx @vscode/vsce package --no-dependencies 2>&1 | Out-Null
+$ErrorActionPreference = "Stop"
 Pop-Location
+
+# ── Download Kokoro TTS models if not present ────────────────────────────────
+$KokoroModel  = "$ScriptDir\kokoro-v1.0.onnx"
+$KokoroVoices = "$ScriptDir\voices-v1.0.bin"
+$HfBase = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+
+if (-not (Test-Path $KokoroModel)) {
+    Write-Host "[1.5/3] Downloading Kokoro TTS model (~370 MB)..."
+    Invoke-WebRequest -Uri "$HfBase/kokoro-v1.0.onnx" -OutFile $KokoroModel
+}
+if (-not (Test-Path $KokoroVoices)) {
+    Write-Host "[1.5/3] Downloading Kokoro voices (~4 MB)..."
+    Invoke-WebRequest -Uri "$HfBase/voices-v1.0.bin" -OutFile $KokoroVoices
+}
 
 # ── Package Voice ─────────────────────────────────────────────────────────────
 Write-Host "[2/3] Packaging cyrus-voice..."
@@ -36,13 +52,9 @@ Copy-Item "$ScriptDir\requirements-voice.txt"     "$VoiceStage\"
 Copy-Item "$ScriptDir\install-voice.ps1"          "$VoiceStage\"
 Copy-Item "$ScriptDir\install-voice.sh"           "$VoiceStage\"
 
-# Include Kokoro models if present
-if (Test-Path "$ScriptDir\kokoro-v1.0.onnx") {
-    Copy-Item "$ScriptDir\kokoro-v1.0.onnx" "$VoiceStage\"
-}
-if (Test-Path "$ScriptDir\voices-v1.0.bin") {
-    Copy-Item "$ScriptDir\voices-v1.0.bin" "$VoiceStage\"
-}
+# Include Kokoro TTS models
+if (Test-Path $KokoroModel)  { Copy-Item $KokoroModel  "$VoiceStage\" }
+if (Test-Path $KokoroVoices) { Copy-Item $KokoroVoices "$VoiceStage\" }
 
 Compress-Archive -Path "$VoiceStage\*" -DestinationPath "$DistDir\cyrus-voice-$Version.zip" -Force
 Remove-Item $VoiceStage -Recurse -Force

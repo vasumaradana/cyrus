@@ -103,11 +103,17 @@ def _make_alias(proj: str) -> str:
 
 def _resolve_project(query: str, aliases: dict) -> str | None:
     q = query.lower().strip()
+    # Exact match first
     if q in aliases:
         return aliases[q]
+    # Partial matches — prefer longest (most specific) alias match
+    candidates = []
     for alias, proj in aliases.items():
         if q in alias or alias in q:
-            return proj
+            candidates.append((len(alias), alias, proj))
+    if candidates:
+        candidates.sort(reverse=True)  # longest alias wins
+        return candidates[0][2]
     return None
 
 
@@ -1498,6 +1504,7 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
         event = msg.get("event", "stop")
         cwd   = msg.get("cwd", "")
         proj  = _resolve_project_from_cwd(cwd, session_mgr)
+        print(f"[Hook] event={event}, cwd={cwd!r}, resolved_proj={proj!r}")
         loop  = asyncio.get_event_loop()
 
         if event == "stop":

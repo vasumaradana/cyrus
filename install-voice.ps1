@@ -24,13 +24,20 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Copy-Item "$ScriptDir\cyrus_voice.py" "$InstallDir\" -Force
 Copy-Item "$ScriptDir\requirements-voice.txt" "$InstallDir\" -Force
 
-# Copy Kokoro model files if present (optional TTS)
+# Copy or download Kokoro TTS model files
+$HfBase = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 if (Test-Path "$ScriptDir\kokoro-v1.0.onnx") {
-    Write-Host "       Copying Kokoro TTS model (this may take a moment)..."
+    Write-Host "       Copying Kokoro TTS model..."
     Copy-Item "$ScriptDir\kokoro-v1.0.onnx" "$InstallDir\" -Force
+} elseif (-not (Test-Path "$InstallDir\kokoro-v1.0.onnx")) {
+    Write-Host "       Downloading Kokoro TTS model (~370 MB)..."
+    Invoke-WebRequest -Uri "$HfBase/kokoro-v1.0.onnx" -OutFile "$InstallDir\kokoro-v1.0.onnx"
 }
 if (Test-Path "$ScriptDir\voices-v1.0.bin") {
     Copy-Item "$ScriptDir\voices-v1.0.bin" "$InstallDir\" -Force
+} elseif (-not (Test-Path "$InstallDir\voices-v1.0.bin")) {
+    Write-Host "       Downloading Kokoro voices (~4 MB)..."
+    Invoke-WebRequest -Uri "$HfBase/voices-v1.0.bin" -OutFile "$InstallDir\voices-v1.0.bin"
 }
 
 # 3. Create virtual environment and install dependencies
