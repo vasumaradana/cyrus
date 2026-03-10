@@ -89,6 +89,13 @@ $HooksConfig = @{
                 timeout = 5
             })
         })
+        PreCompact = @(@{
+            hooks = @(@{
+                type    = "command"
+                command = "$HookPython $HookScript"
+                timeout = 5
+            })
+        })
     }
 }
 

@@ -175,7 +175,7 @@ async def _send(msg: dict) -> None:
         except Exception:
             _voice_writer = None
     # Broadcast to mobile WebSocket clients
-    if _mobile_clients and msg.get("type") in ("speak", "prompt", "thinking", "tool"):
+    if _mobile_clients and msg.get("type") in ("speak", "prompt", "thinking", "tool", "status"):
         mobile_msg = dict(msg)
         if "full_text" in mobile_msg:
             mobile_msg["text"] = mobile_msg.pop("full_text")
@@ -1524,7 +1524,7 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
             tool = msg.get("tool", "")
             cmd  = msg.get("command", "")
             print(f"[pre_tool] Received: tool={tool}, proj={proj!r}, cmd={cmd[:60]}")
-            await _send({"type": "tool", "tool": tool, "command": cmd})
+            await _send({"type": "tool", "tool": tool, "command": cmd, "project": proj})
             pw   = (session_mgr._perm_watchers.get(proj) or
                     next(iter(session_mgr._perm_watchers.values()), None))
             if pw:
@@ -1557,6 +1557,15 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
                 spoken = f"{prefix}{message}"
                 print(f"\n[Notification] {spoken}")
                 await _speak_urgent(spoken)
+
+        elif event == "pre_compact":
+            trigger = msg.get("trigger", "auto")
+            reason = "manual compact" if trigger == "manual" else "context window full"
+            spoken = f"Memory compacting: {reason}."
+            print(f"\n[PreCompact] {spoken} (proj={proj!r})")
+            await _send({"type": "status", "status": "compacting",
+                         "trigger": trigger, "project": proj})
+            await _speak_queue.put((proj, spoken))
 
     except asyncio.TimeoutError:
         pass

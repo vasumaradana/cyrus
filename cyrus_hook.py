@@ -41,10 +41,15 @@ def main():
     elif event == "PreToolUse":
         tool       = payload.get("tool_name", "")
         tool_input = payload.get("tool_input") or {}
-        # Only arm for Bash — the main permission-requiring tool
+        cmd = ""
         if tool == "Bash":
             cmd = (tool_input.get("command") or "").strip()
-            _send({"event": "pre_tool", "tool": tool, "command": cmd, "cwd": cwd})
+        elif tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+            cmd = (tool_input.get("file_path") or
+                   tool_input.get("notebook_path") or "").strip()
+        elif tool == "Read":
+            cmd = (tool_input.get("file_path") or "").strip()
+        _send({"event": "pre_tool", "tool": tool, "command": cmd, "cwd": cwd})
 
     elif event == "PostToolUse":
         tool          = payload.get("tool_name", "")
@@ -80,6 +85,10 @@ def main():
         message = (payload.get("message") or "").strip()
         if message:
             _send({"event": "notification", "message": message, "cwd": cwd})
+
+    elif event == "PreCompact":
+        trigger = payload.get("trigger", "auto")
+        _send({"event": "pre_compact", "trigger": trigger, "cwd": cwd})
 
     sys.exit(0)
 

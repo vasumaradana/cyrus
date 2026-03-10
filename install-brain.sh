@@ -79,7 +79,8 @@ cat > "$SETTINGS_FILE" << SETTINGS
     "Stop": [{"hooks": [{"type": "command", "command": "$HOOK_PYTHON $HOOK_SCRIPT", "timeout": 5}]}],
     "PreToolUse": [{"hooks": [{"type": "command", "command": "$HOOK_PYTHON $HOOK_SCRIPT", "timeout": 5}]}],
     "PostToolUse": [{"hooks": [{"type": "command", "command": "$HOOK_PYTHON $HOOK_SCRIPT", "timeout": 5}]}],
-    "Notification": [{"hooks": [{"type": "command", "command": "$HOOK_PYTHON $HOOK_SCRIPT", "timeout": 5}]}]
+    "Notification": [{"hooks": [{"type": "command", "command": "$HOOK_PYTHON $HOOK_SCRIPT", "timeout": 5}]}],
+    "PreCompact": [{"hooks": [{"type": "command", "command": "$HOOK_PYTHON $HOOK_SCRIPT", "timeout": 5}]}]
   }
 }
 SETTINGS
