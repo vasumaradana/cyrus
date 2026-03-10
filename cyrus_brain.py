@@ -37,7 +37,26 @@ import comtypes
 import pyautogui
 import pyperclip
 import pygetwindow as gw
-import uiautomation as auto
+try:
+    import uiautomation as auto
+except Exception:
+    # comtypes cache is likely corrupted — clear it and retry
+    try:
+        import comtypes.gen, shutil, os as _os
+        _gen_dir = _os.path.dirname(comtypes.gen.__file__)
+        shutil.rmtree(_gen_dir, ignore_errors=True)
+        _os.makedirs(_gen_dir, exist_ok=True)
+        # Re-create __init__.py so comtypes.gen is still a package
+        with open(_os.path.join(_gen_dir, "__init__.py"), "w") as _f:
+            _f.write("# auto-generated\n")
+        print("[Brain] Cleared corrupted comtypes cache, retrying...")
+        import importlib
+        importlib.invalidate_caches()
+        import uiautomation as auto
+    except Exception as _e2:
+        print(f"[Brain] FATAL: UIAutomation still unavailable after cache clear ({_e2}).")
+        print("[Brain] Try: pip install --force-reinstall comtypes uiautomation")
+        raise
 from collections import deque
 
 # ── Configuration ──────────────────────────────────────────────────────────────
