@@ -131,6 +131,20 @@ def _vs_code_windows() -> list[tuple[str, str]]:
     return result
 
 
+def _sanitize_for_speech(text: str) -> str:
+    """Replace Unicode chars that TTS engines read as garbled UTF-8 bytes."""
+    return (text
+            .replace("\u2014", ", ")   # em dash
+            .replace("\u2013", ", ")   # en dash
+            .replace("\u2026", "...")  # ellipsis
+            .replace("\u2018", "'")    # left single quote
+            .replace("\u2019", "'")    # right single quote
+            .replace("\u201c", '"')    # left double quote
+            .replace("\u201d", '"')    # right double quote
+            .replace("\u2022", ", ")   # bullet
+            )
+
+
 def clean_for_speech(text: str) -> str:
     text = re.sub(r"```[\s\S]*?```", "See the chat for the code.", text)
     text = re.sub(r"`([^`]+)`", r"\1", text)
@@ -142,6 +156,8 @@ def clean_for_speech(text: str) -> str:
     text = re.sub(r"\n\s*\d+\.\s+", ". ", text)
     text = re.sub(r"\n+", " ", text)
     text = re.sub(r"\s{2,}", " ", text)
+    # Replace Unicode chars that TTS engines read as garbled UTF-8 bytes
+    text = _sanitize_for_speech(text)
     words = text.split()
     if len(words) > MAX_SPEECH_WORDS:
         text = " ".join(words[:MAX_SPEECH_WORDS]) + ". See the chat for the full response."
@@ -163,20 +179,6 @@ def _strip_fillers(text: str) -> str:
 
 
 # ── Send to voice ──────────────────────────────────────────────────────────────
-
-def _sanitize_for_speech(text: str) -> str:
-    """Replace Unicode chars that TTS engines read as garbled UTF-8 bytes."""
-    return (text
-            .replace("\u2014", ", ")   # em dash  —
-            .replace("\u2013", ", ")   # en dash  –
-            .replace("\u2026", "...")  # ellipsis …
-            .replace("\u2018", "'")    # left single quote
-            .replace("\u2019", "'")    # right single quote
-            .replace("\u201c", '"')    # left double quote
-            .replace("\u201d", '"')    # right double quote
-            .replace("\u2022", ", ")   # bullet •
-            )
-
 
 async def _send(msg: dict) -> None:
     """Send one JSON message to voice + mobile clients. Fire-and-forget."""
