@@ -102,7 +102,8 @@ def _make_alias(proj: str) -> str:
 
 
 def _resolve_project(query: str, aliases: dict) -> str | None:
-    q = query.lower().strip()
+    # Normalize query the same way aliases are built (dashes/underscores → spaces)
+    q = re.sub(r"\s+", " ", re.sub(r"[-_]", " ", query.lower())).strip()
     # Exact match first
     if q in aliases:
         return aliases[q]
@@ -817,16 +818,21 @@ class PermissionWatcher:
         return perm_btn, perm_cmd, prompt_ctrl, prompt_label
 
     def arm_from_hook(self, tool: str, cmd: str, loop: asyncio.AbstractEventLoop) -> None:
-        """Pre-arm from PreToolUse hook — silent until UIA confirms a dialog exists."""
+        """Arm from PreToolUse hook — skip auto-allowed tools, announce others immediately."""
         if tool in self._AUTO_ALLOWED_TOOLS:
             return  # never needs permission
         if self._pending:
             return  # already waiting for a response
-        self._pre_armed       = True
-        self._pre_armed_tool  = tool
-        self._pre_armed_cmd   = cmd
-        self._pre_armed_since = time.time()
-        print(f"[Permission/hook] Pre-armed: {tool}: {cmd[:60]}")
+        self._allow_btn     = "keyboard"
+        self._pending       = True
+        self._pending_since = time.time()
+        self._announced     = f"hook:{cmd}"
+        prefix = f"In {self.project_name}: " if self.project_name else ""
+        cmd_short = cmd[:120] if cmd else tool
+        prompt = f"{prefix}Allow {tool}: {cmd_short}. Say yes or no."
+        print(f"\n[Permission/hook] {prefix}{tool}: {cmd}")
+        _send_threadsafe({"type": "stop_speech"}, loop)
+        asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
 
     def handle_response(self, text: str) -> bool:
         if not self._pending or not self._allow_btn:
@@ -1203,10 +1209,8 @@ def _submit_to_vscode_impl(text: str) -> bool:
         time.sleep(0.3)
     coords = _chat_input_coords.get(proj)
 
-    # Fallback: active project key may not match cached session — use any available coords
-    if not coords and _chat_input_coords:
-        fallback_proj, coords = next(iter(_chat_input_coords.items()))
-        print(f"[submit] active={proj!r} not in coords cache — using fallback from {fallback_proj!r}")
+    # No cached coords for this project — do NOT fall back to another project's coords
+    # (different windows have different pixel positions)
 
     if not coords:
         # Last-resort UIA search — no window activation yet
@@ -1265,6 +1269,12 @@ def _submit_to_vscode_impl(text: str) -> bool:
 
     pyperclip.copy(text)
     pyautogui.hotkey("ctrl", "v")
+    time.sleep(0.15)
+    # Re-assert focus before Enter — another window can steal focus between paste and submit
+    try:
+        win.activate()
+    except Exception:
+        pass
     time.sleep(0.05)
     pyautogui.press("enter")
     time.sleep(0.05)
