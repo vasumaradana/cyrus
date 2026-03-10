@@ -101,14 +101,14 @@ Download the two zip packages from [Releases](../../releases):
 
 ```powershell
 # Windows
-Expand-Archive cyrus-brain-0.1.0.zip -DestinationPath cyrus-brain
+Expand-Archive cyrus-brain-0.1.2.zip -DestinationPath cyrus-brain
 cd cyrus-brain
 powershell -ExecutionPolicy Bypass -File install-brain.ps1
 ```
 
 ```bash
 # macOS / Linux
-unzip cyrus-brain-0.1.0.zip -d cyrus-brain
+unzip cyrus-brain-0.1.2.zip -d cyrus-brain
 cd cyrus-brain
 bash install-brain.sh
 ```
@@ -126,14 +126,14 @@ The installer handles everything automatically:
 
 ```powershell
 # Windows
-Expand-Archive cyrus-voice-0.1.0.zip -DestinationPath cyrus-voice
+Expand-Archive cyrus-voice-0.1.2.zip -DestinationPath cyrus-voice
 cd cyrus-voice
 powershell -ExecutionPolicy Bypass -File install-voice.ps1 -BrainHost <brain-ip>
 ```
 
 ```bash
 # macOS / Linux
-unzip cyrus-voice-0.1.0.zip -d cyrus-voice
+unzip cyrus-voice-0.1.2.zip -d cyrus-voice
 cd cyrus-voice
 bash install-voice.sh --brain-host <brain-ip>
 ```
@@ -202,10 +202,10 @@ All 4 hook events are configured automatically by the brain installer:
 ## Building Release Packages
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build-release.ps1 -Version 0.1.0
+powershell -ExecutionPolicy Bypass -File build-release.ps1 -Version 0.1.2
 ```
 
-Creates `dist/cyrus-voice-0.1.0.zip` and `dist/cyrus-brain-0.1.0.zip`.
+Creates `dist/cyrus-voice-0.1.2.zip` and `dist/cyrus-brain-0.1.2.zip`.
 
 ## Requirements
 
