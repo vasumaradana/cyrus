@@ -18,6 +18,11 @@ Voice assistant layer for Claude Code in VS Code — speak naturally, Cyrus tran
 | 10 | [Setup & Installation](./10-setup-and-installation.md) | Prerequisites, dependencies, dev setup, network scenarios, hook config |
 | 11 | [File Reference](./11-file-reference.md) | File-by-file API reference — every function, class, and constant |
 
+
+## New Features for Cyrus 2.0
+| 12 | [Code Audit](./12-code-audit.md) | Code quality audit — anti-patterns, DRY violations, thread safety, security |
+| 13 | [Docker Containerization](./13-docker-containerization.md) | Headless brain mode, Docker setup, cross-platform support (macOS/Linux/Windows) |
+
 ## Quick Start
 
 ```bash
@@ -47,3 +52,4 @@ See [10 — Setup & Installation](./10-setup-and-installation.md) for full setup
 4. [04 — Brain & Routing](./04-brain-and-routing.md) — command processing logic
 5. [07 — Threading & Concurrency](./07-threading-and-concurrency.md) — critical for avoiding bugs
 6. [11 — File Reference](./11-file-reference.md) — quick lookup for any function/class
+7. [12 — Code Audit](./12-code-audit.md) — known issues and prioritized fixes
