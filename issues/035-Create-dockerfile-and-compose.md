@@ -1,3 +1,19 @@
+---
+id=035-Create-dockerfile-and-compose
+title=Issue 035: Create Dockerfile and Docker Compose
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 035: Create Dockerfile and Docker Compose
 
 ## Sprint
@@ -112,3 +128,4 @@ Create a `Dockerfile` for containerizing the Cyrus brain, a `docker-compose.yml`
 8. Test health endpoint: `curl http://localhost:8766/health`
 9. Test hook connection: `echo '{"event":"stop","text":"test"}' | nc localhost 8767`
 10. Test from host machine: `telnet localhost 8766` (should accept connection)
+

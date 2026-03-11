@@ -1,3 +1,19 @@
+---
+id=027-Create-centralized-config-module
+title=Issue 027: Create Centralized Config Module
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 027: Create Centralized Config Module
 
 ## Sprint
@@ -66,3 +82,4 @@ Consolidate all hardcoded configuration values (ports, timeouts, thresholds, wak
 3. Run `CYRUS_TTS_TIMEOUT=30.0 python cyrus2/cyrus_voice.py` — verify timeout respected
 4. Verify .env.example matches all config keys
 5. Verify config module loads without errors in headless and full modes
+

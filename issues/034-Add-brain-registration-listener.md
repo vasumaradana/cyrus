@@ -1,3 +1,19 @@
+---
+id=034-Add-brain-registration-listener
+title=Issue 034: Add Brain Registration Listener
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 034: Add Brain Registration Listener
 
 ## Sprint
@@ -148,3 +164,4 @@ Implement an async TCP server on port 8770 in `cyrus2/cyrus_brain.py` to accept 
 9. Verify brain logs "Blur: test-proj"
 10. Disconnect client — verify brain logs "test-proj disconnected"
 11. Multiple concurrent registrations — verify all tracked in _registered_sessions
+

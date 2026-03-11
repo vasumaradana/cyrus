@@ -1,3 +1,19 @@
+---
+id=039-Update-documentation-for-v2
+title=Issue 039: Update Documentation for v2
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 039: Update Documentation for v2
 
 ## Sprint
@@ -151,3 +167,4 @@ Update all documentation to reflect Cyrus 2.0 rewrite with new cyrus2/ directory
 5. Verify all file paths reference cyrus2/
 6. Check configuration table against cyrus_config.py
 7. Verify troubleshooting covers common issues
+

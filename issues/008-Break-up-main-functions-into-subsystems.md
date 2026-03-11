@@ -1,3 +1,20 @@
+---
+id=008-Break-up-main-functions-into-subsystems
+title=Issue 008: Break up main() functions into subsystems
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=80775
+total_output_tokens=4
+total_duration_seconds=51
+total_iterations=1
+run_count=1
+---
+
 # Issue 008: Break up main() functions into subsystems
 
 ## Sprint
@@ -166,3 +183,15 @@ None (but benefits from Issue 005 extraction)
 - Verify error handling: mock a failure in each subsystem and confirm graceful exit
 - Check startup logs: `python cyrus_brain.py 2>&1 | grep "Initializing"`
 - Measure startup time before/after refactor (should be unchanged)
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:33:40Z
+
+- **From:** NEW
+- **Duration in stage:** 51s
+- **Input tokens:** 80,775 (final context: 80,775)
+- **Output tokens:** 4
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

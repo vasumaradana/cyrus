@@ -1,3 +1,20 @@
+---
+id=022-Write-test-hook
+title=Issue 022: Write test_hook.py (Tier 2)
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=49580
+total_output_tokens=5
+total_duration_seconds=142
+total_iterations=1
+run_count=1
+---
+
 # Issue 022: Write test_hook.py (Tier 2)
 
 ## Sprint
@@ -71,3 +88,15 @@ pytest cyrus2/tests/test_hook.py -v
 pytest cyrus2/tests/test_hook.py::test_stop_event -v
 pytest cyrus2/tests/test_hook.py -k "error or invalid" -v
 ```
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:29:49Z
+
+- **From:** NEW
+- **Duration in stage:** 142s
+- **Input tokens:** 49,580 (final context: 49,580)
+- **Output tokens:** 5
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

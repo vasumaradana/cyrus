@@ -1,3 +1,20 @@
+---
+id=025-Write-test-chat-extraction
+title=Issue 025: Write test_chat_extraction.py (Tier 4)
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=45582
+total_output_tokens=3
+total_duration_seconds=69
+total_iterations=1
+run_count=1
+---
+
 # Issue 025: Write test_chat_extraction.py (Tier 4)
 
 ## Sprint
@@ -78,3 +95,15 @@ pytest cyrus2/tests/test_chat_extraction.py::test_anchor_detection -v
 pytest cyrus2/tests/test_chat_extraction.py -k "backtrack or extract" -v
 pytest cyrus2/tests/test_chat_extraction.py -k "missing or error" -v
 ```
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:38:55Z
+
+- **From:** NEW
+- **Duration in stage:** 69s
+- **Input tokens:** 45,582 (final context: 45,582)
+- **Output tokens:** 3
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

@@ -1,3 +1,20 @@
+---
+id=020-Write-test-project-matching
+title=Issue 020: Write test_project_matching.py (Tier 1)
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=44255
+total_output_tokens=9
+total_duration_seconds=90
+total_iterations=1
+run_count=1
+---
+
 # Issue 020: Write test_project_matching.py (Tier 1)
 
 ## Sprint
@@ -64,3 +81,15 @@ pytest cyrus2/tests/test_project_matching.py -v
 pytest cyrus2/tests/test_project_matching.py::test_extract_project -v
 pytest cyrus2/tests/test_project_matching.py -k "alias" -v
 ```
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:26:33Z
+
+- **From:** NEW
+- **Duration in stage:** 90s
+- **Input tokens:** 44,255 (final context: 44,255)
+- **Output tokens:** 9
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

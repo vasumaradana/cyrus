@@ -1,3 +1,19 @@
+---
+id=031-Add-companion-extension-registration
+title=Issue 031: Add Companion Extension Registration
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 031: Add Companion Extension Registration
 
 ## Sprint
@@ -125,3 +141,4 @@ Enhance the companion extension to initiate outbound connection to the brain on 
 5. Stop brain — verify extension logs reconnect attempts
 6. Restart brain — verify extension reconnects automatically
 7. Change brainHost/brainPort in settings — verify uses new values
+

@@ -1,3 +1,20 @@
+---
+id=004-Pin-all-production-dependencies
+title=Issue 004: Pin All Production Dependencies
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=38121
+total_output_tokens=3
+total_duration_seconds=80
+total_iterations=1
+run_count=1
+---
+
 # Issue 004: Pin All Production Dependencies
 
 ## Sprint
@@ -117,3 +134,30 @@ When pinning these versions, verify compatibility:
 - **silero-vad**: Generally stable, but verify with pinned torch version
 - **edge-tts**: Usually stable, minimal dependencies
 - **kokoro-onnx**: GPU variant; ensure CUDA/ONNXRuntime compatibility
+
+## Interview Questions
+
+1. The acceptance criteria claim base=17, voice=10, brain=8 packages, but implementation steps describe base=7, voice=10, brain=16 packages. The actual v1 files have requirements.txt=16, requirements-voice.txt=10, requirements-brain.txt=7. Which structure is correct?
+   - Follow implementation steps (7, 10, 16) — AC numbers are errors
+   - Follow AC (17, 10, 8) — implementation steps are outdated
+   - Follow actual v1 files (16, 10, 7) — both AC and implementation steps need fixes
+2. The AC states 'Git shows changed files (not new files)' but Files to Create/Modify says 'create'. Should we update the v1 requirements files in the root directory, or create new pinned files in cyrus2/?
+   - Update v1 files in root (main.py, cyrus_voice.py, cyrus_brain.py directory level)
+   - Create new pinned files in cyrus2/ directory (for the rewrite)
+   - Do both — pin v1 files AND create copies in cyrus2/
+3. GPU compatibility verification (torch, onnxruntime-gpu, kokoro-onnx) requires checking CUDA version compatibility. Should the implementation research compatible versions from package docs, or is there a known-good GPU environment to test against?
+   - Research compatible versions from package changelog/docs/GitHub issues
+   - There is a test environment available with GPU hardware to validate
+   - Skip GPU compatibility testing — just use pip freeze from current environment
+
+## Stage Log
+
+### NEW — 2026-03-11 18:00:46Z
+
+- **From:** NEW
+- **Duration in stage:** 80s
+- **Input tokens:** 38,121 (final context: 38,121)
+- **Output tokens:** 3
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

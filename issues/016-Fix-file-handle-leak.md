@@ -1,3 +1,20 @@
+---
+id=016-Fix-file-handle-leak
+title=Issue 016: Fix file handle leak
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=38668
+total_output_tokens=4
+total_duration_seconds=89
+total_iterations=1
+run_count=1
+---
+
 # Issue 016: Fix file handle leak
 
 ## Sprint
@@ -78,3 +95,15 @@ python -c "from cyrus2.cyrus_brain import ...; port = read_port('/tmp/test_port.
 lsof -p $(pgrep -f "python cyrus_brain.py") | grep port_file
 # Expected: no lingering file descriptors
 ```
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:37:46Z
+
+- **From:** NEW
+- **Duration in stage:** 89s
+- **Input tokens:** 38,668 (final context: 38,668)
+- **Output tokens:** 4
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

@@ -1,3 +1,19 @@
+---
+id=030-Add-headless-mode-to-brain
+title=Issue 030: Add Headless Mode to Brain
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 030: Add Headless Mode to Brain
 
 ## Sprint
@@ -87,3 +103,4 @@ Add `CYRUS_HEADLESS=1` environment variable guard in `cyrus2/cyrus_brain.py` to 
 4. In HEADLESS mode, verify _vs_code_windows() returns empty list (before companion registers)
 5. In HEADLESS mode, verify active tracker thread doesn't start
 6. In HEADLESS mode, attempt to trigger permission via hook — verify ChatWatcher responds via Stop event
+

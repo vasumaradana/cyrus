@@ -1,3 +1,19 @@
+---
+id=032-Add-extension-focus-tracking
+title=Issue 032: Add Extension Focus Tracking
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 032: Add Extension Focus Tracking
 
 ## Sprint
@@ -75,3 +91,4 @@ Hook `vscode.window.onDidChangeWindowState` event in the companion extension to 
 5. Verify workspace name is correct in messages
 6. Rapidly switch focus 10 times — verify no connection errors
 7. Disconnect brain connection while switching focus — verify no exceptions in extension
+

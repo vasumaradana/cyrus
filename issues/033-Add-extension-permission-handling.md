@@ -1,3 +1,19 @@
+---
+id=033-Add-extension-permission-handling
+title=Issue 033: Add Extension Permission Handling
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 033: Add Extension Permission Handling
 
 ## Sprint
@@ -95,3 +111,4 @@ Extension receives `permission_respond` and `prompt_respond` messages from the b
 6. Send `{"type": "permission_respond", "action": "deny"}` to extension
 7. Verify extension logs key press and keyboard sends "Escape"
 8. Test with VS Code focused vs unfocused
+

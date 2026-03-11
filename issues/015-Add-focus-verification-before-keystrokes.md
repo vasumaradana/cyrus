@@ -1,3 +1,20 @@
+---
+id=015-Add-focus-verification-before-keystrokes
+title=Issue 015: Add focus verification before keystrokes
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=45927
+total_output_tokens=8
+total_duration_seconds=70
+total_iterations=1
+run_count=1
+---
+
 # Issue 015: Add focus verification before keystrokes
 
 ## Sprint
@@ -66,3 +83,15 @@ python cyrus2/cyrus_brain.py &
 CYRUS_LOG_LEVEL=DEBUG python cyrus2/cyrus_brain.py 2>&1 | grep "Focus mismatch"
 # Expected: message identifies wrong window
 ```
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:19:03Z
+
+- **From:** NEW
+- **Duration in stage:** 70s
+- **Input tokens:** 45,927 (final context: 45,927)
+- **Output tokens:** 8
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

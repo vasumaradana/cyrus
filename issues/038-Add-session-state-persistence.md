@@ -1,3 +1,19 @@
+---
+id=038-Add-session-state-persistence
+title=Issue 038: Add Session State Persistence
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 038: Add Session State Persistence
 
 ## Sprint
@@ -136,3 +152,4 @@ Implement persistence of brain session state (aliases, pending queues, project m
 8. Test with corrupted state.json — verify graceful fallback
 9. Test with missing state file — verify clean startup
 10. Test CYRUS_STATE_FILE override: `CYRUS_STATE_FILE=/tmp/custom.json python cyrus2/cyrus_brain.py`
+

@@ -1,3 +1,20 @@
+---
+id=024-Write-test-vad-logic
+title=Issue 024: Write test_vad_logic.py (Tier 3)
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=49768
+total_output_tokens=5
+total_duration_seconds=78
+total_iterations=1
+run_count=1
+---
+
 # Issue 024: Write test_vad_logic.py (Tier 3)
 
 ## Sprint
@@ -78,3 +95,26 @@ pytest cyrus2/tests/test_vad_logic.py::test_state_transitions -v
 pytest cyrus2/tests/test_vad_logic.py -k "buffer or silence" -v
 pytest cyrus2/tests/test_vad_logic.py -k "timeout" -v
 ```
+
+## Interview Questions
+
+1. The issue references VADStateMachine and RingBuffer classes in cyrus_voice.py, but the current implementation uses a functional vad_loop() function with inline logic (ring buffer is a Python deque). Should VAD logic be refactored into classes as part of this issue, or should tests be written directly against the existing functional vad_loop() implementation?
+   - Refactor VAD into classes first, then write tests (may require splitting into two issues)
+   - Write tests directly against the existing vad_loop() function with mocked Silero model
+   - Split this into two separate issues: one for VAD refactoring, one for tests
+2. The acceptance criteria assume a VAD 'state machine' with transitions (idle→listening→speaking), but the current vad_loop() is a procedural implementation with local state variables (recording, frames, silence_count, etc.). Should the test criteria be updated to match the functional approach, or should VAD be refactored to use an explicit state machine pattern?
+   - Update test criteria to work with the existing procedural implementation
+   - Refactor VAD to use an explicit state machine class before writing tests
+   - Write tests that treat vad_loop() as a state machine conceptually (test state transitions through behavior)
+
+## Stage Log
+
+### NEW — 2026-03-11 18:32:38Z
+
+- **From:** NEW
+- **Duration in stage:** 78s
+- **Input tokens:** 49,768 (final context: 49,768)
+- **Output tokens:** 5
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

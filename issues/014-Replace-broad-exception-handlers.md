@@ -1,3 +1,19 @@
+---
+id=014-Replace-broad-exception-handlers
+title=Issue 014: Replace broad exception handlers
+state=SPLIT
+parent=
+children=040,041,042,043,044
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=47728
+total_output_tokens=7
+total_duration_seconds=137
+total_iterations=1
+run_count=1
+---
+
 # Issue 014: Replace broad exception handlers
 
 ## Sprint
@@ -63,3 +79,24 @@ grep -B2 "except Exception:" cyrus2/cyrus_brain.py | grep -c "pass"
 CYRUS_LOG_LEVEL=DEBUG python cyrus2/cyrus_brain.py 2>&1 | grep "exc_info"
 # Expected: exception details appear in log when errors occur
 ```
+
+## Auto-Split by Triage
+
+This issue was deemed too complex for a single session and has been split into 5 children:
+- 040
+- 041
+- 042
+- 043
+- 044
+
+## Stage Log
+
+### SPLIT — 2026-03-11 18:17:53Z
+
+- **From:** NEW
+- **Duration in stage:** 137s
+- **Input tokens:** 47,728 (final context: 47,728)
+- **Output tokens:** 7
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

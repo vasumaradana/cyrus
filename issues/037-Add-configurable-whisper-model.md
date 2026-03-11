@@ -1,3 +1,19 @@
+---
+id=037-Add-configurable-whisper-model
+title=Issue 037: Add Configurable Whisper Model
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 037: Add Configurable Whisper Model
 
 ## Sprint
@@ -70,3 +86,4 @@ Make Whisper speech-to-text model selection configurable via `CYRUS_WHISPER_MODE
 6. Verify transcription still works correctly
 7. Test invalid: `CYRUS_WHISPER_MODEL=invalid python cyrus2/cyrus_voice.py`
 8. Verify warning logged and falls back to medium.en
+

@@ -1,3 +1,19 @@
+---
+id=036-Add-health-check-endpoint
+title=Issue 036: Add Health Check Endpoint
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 036: Add Health Check Endpoint
 
 ## Sprint
@@ -101,3 +117,4 @@ Implement a simple HTTP `/health` endpoint on the brain that returns JSON status
 5. Verify active_project reflects focus events
 6. Run health check while brain is under load — verify <100ms response
 7. Stop brain — verify health endpoint returns error
+

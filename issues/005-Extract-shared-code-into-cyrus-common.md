@@ -1,3 +1,20 @@
+---
+id=005-Extract-shared-code-into-cyrus-common
+title=Issue 005: Extract shared code into cyrus_common.py
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=79166
+total_output_tokens=11
+total_duration_seconds=156
+total_iterations=2
+run_count=2
+---
+
 # Issue 005: Extract shared code into cyrus_common.py
 
 ## Sprint
@@ -92,3 +109,36 @@ None
 - Verify duplicate definitions are gone: `grep -r "^def _extract_project" cyrus2/`
 - Run linter on all three files: `pylint cyrus_common.py main.py cyrus_brain.py`
 - Line count comparison (before vs after): `wc -l cyrus2/*.py`
+
+## Stage Log
+
+### NEW — 2026-03-11 17:49:25Z
+
+- **From:** NEW
+- **Duration in stage:** 90s
+- **Input tokens:** 52,964 (final context: 52,964)
+- **Output tokens:** 8
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage
+
+
+### GROOMED — 2026-03-11 17:58:52Z
+
+- **From:** NEW
+- **Duration in stage:** 66s
+- **Input tokens:** 26,202 (final context: 26,202)
+- **Output tokens:** 3
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** interview
+## Interview Q&A
+
+1. **Q:** The refactoring of main.py to use service-delegation (required before extraction per the interview)—should this refactoring be a separate issue completed first, or is it part of 005's scope?
+   **A:** Part of 005's scope (refactor main.py first, then extract shared code)
+
+2. **Q:** The issue lists `_sanitize_for_speech()` as a function to extract, but it only exists in cyrus_brain.py, not in main.py. Should the extraction ignore this function, add it to main.py first, or handle it differently?
+   **A:** Only extract to cyrus_common.py and have cyrus_brain.py import it (main.py won't use it)
+
+3. **Q:** MAX_SPEECH_WORDS has different values in each file (main.py=30, cyrus_brain.py=50). The issue acknowledges this but implies it should be extracted. Should it remain configurable per file instead of being shared?
+   **A:** Extract to cyrus_common.py with a per-file override mechanism

@@ -1,3 +1,20 @@
+---
+id=021-Write-test-fast-command
+title=Issue 021: Write test_fast_command.py (Tier 1)
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=63242
+total_output_tokens=12
+total_duration_seconds=93
+total_iterations=2
+run_count=2
+---
+
 # Issue 021: Write test_fast_command.py (Tier 1)
 
 ## Sprint
@@ -68,3 +85,36 @@ pytest cyrus2/tests/test_fast_command.py -v
 pytest cyrus2/tests/test_fast_command.py::test_pause -v
 pytest cyrus2/tests/test_fast_command.py -k "switch or rename" -v
 ```
+
+## Stage Log
+
+### NEW — 2026-03-11 18:27:27Z
+
+- **From:** NEW
+- **Duration in stage:** 53s
+- **Input tokens:** 37,614 (final context: 37,614)
+- **Output tokens:** 4
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage
+
+
+### GROOMED — 2026-03-11 18:30:59Z
+
+- **From:** NEW
+- **Duration in stage:** 40s
+- **Input tokens:** 25,628 (final context: 25,628)
+- **Output tokens:** 8
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** interview
+## Interview Q&A
+
+1. **Q:** The issue spec describes _fast_command() returning simple command dicts like {"command": "pause"}, but the actual implementation returns {"action": "command", "spoken": "", "message": "", "command": {"type": "pause"}}. Should tests match the current implementation or the spec?
+   **A:** Refactor _fast_command() to match the spec (simpler return format), then test that
+
+2. **Q:** The issue mentions testing pause with optional "duration" parameter and unlock with optional "password" parameter, but the current implementation doesn't parse these. Should tests cover these fields?
+   **A:** Yes—refactor _fast_command() to parse these parameters first, then test
+
+3. **Q:** The issue mentions command types "switch" and "rename", but the actual implementation uses "switch_project" and "rename_session". Should tests use the names in the current code?
+   **A:** No—refactor to use the simpler names first, then test

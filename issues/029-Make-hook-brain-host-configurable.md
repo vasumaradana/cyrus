@@ -1,3 +1,19 @@
+---
+id=029-Make-hook-brain-host-configurable
+title=Issue 029: Make Hook Brain Host Configurable
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 029: Make Hook Brain Host Configurable
 
 ## Sprint
@@ -51,3 +67,4 @@ Allow `cyrus_hook.py` to connect to a brain running on a different host via `CYR
 2. Start brain on 127.0.0.1, set CYRUS_BRAIN_HOST=127.0.0.1 — verify connection works
 3. Set CYRUS_BRAIN_HOST=invalid.host — verify graceful failure (silent, doesn't block Claude Code)
 4. With Docker, set CYRUS_BRAIN_HOST=host.docker.internal — verify hook on host connects to container brain
+

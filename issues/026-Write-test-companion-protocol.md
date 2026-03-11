@@ -1,3 +1,20 @@
+---
+id=026-Write-test-companion-protocol
+title=Issue 026: Write test_companion_protocol.py (Tier 4)
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=48811
+total_output_tokens=8
+total_duration_seconds=123
+total_iterations=1
+run_count=1
+---
+
 # Issue 026: Write test_companion_protocol.py (Tier 4)
 
 ## Sprint
@@ -79,3 +96,15 @@ pytest cyrus2/tests/test_companion_protocol.py::test_message_encoding -v
 pytest cyrus2/tests/test_companion_protocol.py -k "decode or receive" -v
 pytest cyrus2/tests/test_companion_protocol.py -k "error or malformed" -v
 ```
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:42:22Z
+
+- **From:** NEW
+- **Duration in stage:** 123s
+- **Input tokens:** 48,811 (final context: 48,811)
+- **Output tokens:** 8
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

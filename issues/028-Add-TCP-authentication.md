@@ -1,3 +1,19 @@
+---
+id=028-Add-TCP-authentication
+title=Issue 028: Add TCP Authentication
+state=NEW
+parent=
+children=
+split_count=0
+force_split=false
+verify_count=0
+total_input_tokens=0
+total_output_tokens=0
+total_duration_seconds=0
+total_iterations=0
+run_count=0
+---
+
 # Issue 028: Add TCP Authentication
 
 ## Sprint
@@ -79,3 +95,4 @@ Add shared-secret token authentication to all TCP server ports (8766, 8767, 8769
 5. Test voice client with/without token
 6. Test mobile client with/without token
 7. Verify token mismatch logged in brain but not exposed to client
+

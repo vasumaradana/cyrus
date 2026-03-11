@@ -1,3 +1,20 @@
+---
+id=006-Deprecate-main-py-monolith
+title=Issue 006: Deprecate main.py monolith
+state=GROOMED
+parent=
+children=
+split_count=0
+force_split=false
+needs_interview=false
+verify_count=0
+total_input_tokens=46716
+total_output_tokens=6
+total_duration_seconds=102
+total_iterations=1
+run_count=1
+---
+
 # Issue 006: Deprecate main.py monolith
 
 ## Sprint
@@ -100,3 +117,15 @@ After common code extraction (Issue 005), `main.py` becomes redundant. The split
 - Run `python cyrus2/cyrus_brain.py` directly and verify it works
 - Run both in split mode and verify they communicate correctly
 - Grep for functions defined only in old main.py: `grep "^def " cyrus2/main.py | grep -v "brain_main"`
+
+## Stage Log
+
+### GROOMED — 2026-03-11 18:07:04Z
+
+- **From:** NEW
+- **Duration in stage:** 102s
+- **Input tokens:** 46,716 (final context: 46,716)
+- **Output tokens:** 6
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage
