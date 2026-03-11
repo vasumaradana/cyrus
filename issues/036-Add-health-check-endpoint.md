@@ -1,17 +1,18 @@
 ---
 id=036-Add-health-check-endpoint
 title=Issue 036: Add Health Check Endpoint
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=68200
+total_output_tokens=10
+total_duration_seconds=152
+total_iterations=2
+run_count=2
 ---
 
 # Issue 036: Add Health Check Endpoint
@@ -118,3 +119,35 @@ Implement a simple HTTP `/health` endpoint on the brain that returns JSON status
 6. Run health check while brain is under load — verify <100ms response
 7. Stop brain — verify health endpoint returns error
 
+## Stage Log
+
+### NEW — 2026-03-11 19:10:58Z
+
+- **From:** NEW
+- **Duration in stage:** 85s
+- **Input tokens:** 41,880 (final context: 41,880)
+- **Output tokens:** 7
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage
+
+
+### GROOMED — 2026-03-11 19:14:22Z
+
+- **From:** NEW
+- **Duration in stage:** 67s
+- **Input tokens:** 26,320 (final context: 26,320)
+- **Output tokens:** 3
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** interview
+## Interview Q&A
+
+1. **Q:** Port 8766 is already in use by the voice TCP server (cyrus_brain.py line 1734). The issue and Issue 035's Dockerfile both reference port 8766 for the health endpoint. Should the health endpoint use a different port (e.g., 8771), be added as HTTP handling within the existing 8766 server, or should the architecture be refactored differently?
+   **A:** 8771
+
+2. **Q:** The issue presents two implementation approaches: (1) http.server + threading (stdlib only, no new dependencies), or (2) aiohttp + async (new dependency, cleaner async integration). The brain already uses asyncio extensively. Which approach is preferred?
+   **A:** aiohttp + async (native async integration)
+
+3. **Q:** Issues 030, 031, 034, and 035 all reference cyrus2/cyrus_brain.py, but cyrus2/ is currently an empty directory. Should this issue target the current /cyrus_brain.py or wait for the cyrus2 refactoring structure to be established?
+   **A:** Target cyrus2/ (assuming it will be prepared by earlier issues)

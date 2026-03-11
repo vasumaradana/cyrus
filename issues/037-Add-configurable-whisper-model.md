@@ -1,17 +1,18 @@
 ---
 id=037-Add-configurable-whisper-model
 title=Issue 037: Add Configurable Whisper Model
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=39747
+total_output_tokens=4
+total_duration_seconds=49
+total_iterations=1
+run_count=1
 ---
 
 # Issue 037: Add Configurable Whisper Model
@@ -87,3 +88,14 @@ Make Whisper speech-to-text model selection configurable via `CYRUS_WHISPER_MODE
 7. Test invalid: `CYRUS_WHISPER_MODEL=invalid python cyrus2/cyrus_voice.py`
 8. Verify warning logged and falls back to medium.en
 
+## Stage Log
+
+### GROOMED — 2026-03-11 19:11:48Z
+
+- **From:** NEW
+- **Duration in stage:** 49s
+- **Input tokens:** 39,747 (final context: 39,747)
+- **Output tokens:** 4
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

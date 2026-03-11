@@ -1,17 +1,18 @@
 ---
 id=031-Add-companion-extension-registration
 title=Issue 031: Add Companion Extension Registration
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=40627
+total_output_tokens=7
+total_duration_seconds=65
+total_iterations=1
+run_count=1
 ---
 
 # Issue 031: Add Companion Extension Registration
@@ -142,3 +143,14 @@ Enhance the companion extension to initiate outbound connection to the brain on 
 6. Restart brain — verify extension reconnects automatically
 7. Change brainHost/brainPort in settings — verify uses new values
 
+## Stage Log
+
+### GROOMED — 2026-03-11 18:58:10Z
+
+- **From:** NEW
+- **Duration in stage:** 65s
+- **Input tokens:** 40,627 (final context: 40,627)
+- **Output tokens:** 7
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

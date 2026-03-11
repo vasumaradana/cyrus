@@ -1,17 +1,18 @@
 ---
 id=029-Make-hook-brain-host-configurable
 title=Issue 029: Make Hook Brain Host Configurable
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=37588
+total_output_tokens=4
+total_duration_seconds=64
+total_iterations=1
+run_count=1
 ---
 
 # Issue 029: Make Hook Brain Host Configurable
@@ -68,3 +69,14 @@ Allow `cyrus_hook.py` to connect to a brain running on a different host via `CYR
 3. Set CYRUS_BRAIN_HOST=invalid.host — verify graceful failure (silent, doesn't block Claude Code)
 4. With Docker, set CYRUS_BRAIN_HOST=host.docker.internal — verify hook on host connects to container brain
 
+## Stage Log
+
+### GROOMED — 2026-03-11 18:46:04Z
+
+- **From:** NEW
+- **Duration in stage:** 64s
+- **Input tokens:** 37,588 (final context: 37,588)
+- **Output tokens:** 4
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

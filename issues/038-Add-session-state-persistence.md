@@ -1,17 +1,18 @@
 ---
 id=038-Add-session-state-persistence
 title=Issue 038: Add Session State Persistence
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=76845
+total_output_tokens=11
+total_duration_seconds=114
+total_iterations=2
+run_count=2
 ---
 
 # Issue 038: Add Session State Persistence
@@ -153,3 +154,35 @@ Implement persistence of brain session state (aliases, pending queues, project m
 9. Test with missing state file — verify clean startup
 10. Test CYRUS_STATE_FILE override: `CYRUS_STATE_FILE=/tmp/custom.json python cyrus2/cyrus_brain.py`
 
+## Stage Log
+
+### NEW — 2026-03-11 19:12:57Z
+
+- **From:** NEW
+- **Duration in stage:** 69s
+- **Input tokens:** 50,158 (final context: 50,158)
+- **Output tokens:** 5
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage
+
+
+### GROOMED — 2026-03-11 19:16:09Z
+
+- **From:** NEW
+- **Duration in stage:** 45s
+- **Input tokens:** 26,687 (final context: 26,687)
+- **Output tokens:** 6
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** interview
+## Interview Q&A
+
+1. **Q:** Which file should be modified: the current /cyrus_brain.py (at project root) or should this wait for the cyrus2/ refactoring to be complete? Issue 027 has the same ambiguity and still needs clarification.
+   **A:** Wait for cyrus2/ refactoring (Issues 005-008) to complete and target cyrus2/cyrus_brain.py
+
+2. **Q:** What state should be persisted from pending queues? The issue mentions 'pending request queues', but each ChatWatcher has its own _pending_queue (list of pending speech texts). Should these be: (a) auto-replayed on startup, (b) discarded, or (c) left empty in the state file?
+   **A:** Load into state file but don't auto-replay (manual recovery)
+
+3. **Q:** The issue shows registering SIGTERM/SIGINT signal handlers directly, but asyncio.run() already handles KeyboardInterrupt. Should signal handlers be integrated using: (a) asyncio.add_signal_handler() for proper async integration, (b) thread-safe signal handlers at module level, or (c) a shutdown hook within the asyncio context?
+   **A:** Use asyncio.add_signal_handler() in the event loop

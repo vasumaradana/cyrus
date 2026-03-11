@@ -1,17 +1,18 @@
 ---
 id=032-Add-extension-focus-tracking
 title=Issue 032: Add Extension Focus Tracking
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=36804
+total_output_tokens=8
+total_duration_seconds=43
+total_iterations=1
+run_count=1
 ---
 
 # Issue 032: Add Extension Focus Tracking
@@ -92,3 +93,14 @@ Hook `vscode.window.onDidChangeWindowState` event in the companion extension to 
 6. Rapidly switch focus 10 times — verify no connection errors
 7. Disconnect brain connection while switching focus — verify no exceptions in extension
 
+## Stage Log
+
+### GROOMED — 2026-03-11 18:58:54Z
+
+- **From:** NEW
+- **Duration in stage:** 43s
+- **Input tokens:** 36,804 (final context: 36,804)
+- **Output tokens:** 8
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

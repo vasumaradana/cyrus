@@ -1,17 +1,18 @@
 ---
 id=028-Add-TCP-authentication
 title=Issue 028: Add TCP Authentication
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=36057
+total_output_tokens=5
+total_duration_seconds=43
+total_iterations=1
+run_count=1
 ---
 
 # Issue 028: Add TCP Authentication
@@ -96,3 +97,21 @@ Add shared-secret token authentication to all TCP server ports (8766, 8767, 8769
 6. Test mobile client with/without token
 7. Verify token mismatch logged in brain but not exposed to client
 
+## Interview Questions
+
+1. Issue 027 (your blocking dependency) has an unresolved question about whether to use cyrus2/ files or root-level files. Before we can finalize Issue 028's implementation approach, which should you follow: (a) After Issue 027 answers that question, modify root-level files (cyrus_config.py, cyrus_brain.py, etc.) in the repo root, or (b) wait for Issue 027 to confirm the cyrus2/ refactoring plan is complete, then modify cyrus2/ files?
+   - Modify root-level files (cyrus_config.py in root, cyrus_brain.py in root, etc.)
+   - Modify cyrus2/ files (cyrus2/cyrus_config.py, cyrus2/cyrus_brain.py, etc.) after Issue 027 is resolved
+   - Wait — resolve Issue 027 first, then retriage Issue 028
+
+## Stage Log
+
+### NEW — 2026-03-11 18:57:05Z
+
+- **From:** NEW
+- **Duration in stage:** 43s
+- **Input tokens:** 36,057 (final context: 36,057)
+- **Output tokens:** 5
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage

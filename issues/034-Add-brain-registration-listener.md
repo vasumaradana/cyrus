@@ -1,17 +1,18 @@
 ---
 id=034-Add-brain-registration-listener
 title=Issue 034: Add Brain Registration Listener
-state=NEW
+state=GROOMED
 parent=
 children=
 split_count=0
 force_split=false
+needs_interview=false
 verify_count=0
-total_input_tokens=0
-total_output_tokens=0
-total_duration_seconds=0
-total_iterations=0
-run_count=0
+total_input_tokens=47081
+total_output_tokens=8
+total_duration_seconds=66
+total_iterations=1
+run_count=1
 ---
 
 # Issue 034: Add Brain Registration Listener
@@ -165,3 +166,14 @@ Implement an async TCP server on port 8770 in `cyrus2/cyrus_brain.py` to accept 
 10. Disconnect client — verify brain logs "test-proj disconnected"
 11. Multiple concurrent registrations — verify all tracked in _registered_sessions
 
+## Stage Log
+
+### GROOMED — 2026-03-11 19:07:55Z
+
+- **From:** NEW
+- **Duration in stage:** 66s
+- **Input tokens:** 47,081 (final context: 47,081)
+- **Output tokens:** 8
+- **Iterations:** 1
+- **Model:** claude-haiku-4-5-20251001
+- **Trigger:** auto/triage
