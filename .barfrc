@@ -1,0 +1,5 @@
+# barf configuration
+ISSUE_PROVIDER=local
+PLAN_MODEL=claude-opus-4-6
+BUILD_MODEL=claude-sonnet-4-6
+CONTEXT_USAGE_PERCENT=75

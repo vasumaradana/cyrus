@@ -10,7 +10,9 @@
       "Bash(powershell -Command \"Get-Service -Name ''ollama'' -ErrorAction SilentlyContinue; Get-Process -Name ''ollama'' -ErrorAction SilentlyContinue | Select-Object Name,Id,Path\")",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:pypi.org)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(ls -lh /home/daniel/Projects/barf/cyrus/*.py | sort -k5 -h -r)",
+      "Bash(find /home/daniel/Projects/barf/cyrus -maxdepth 3 -type f \\\\\\( -name \"*.ini\" -o -name \"*.cfg\" -o -name \"*.yaml\" -o -name \"*.yml\" -o -name \"*.json\" -o -name \"Makefile\" -o -name \"tox.ini\" \\\\\\) 2>/dev/null | head -20)"
     ]
   }
 }
