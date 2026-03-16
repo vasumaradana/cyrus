@@ -1,9 +1,0 @@
-{
-  "name": "cyrus",
-  "version": "2.0.0",
-  "scripts": {
-    "build": "python3 -c \"import tomllib; f=open('cyrus2/pyproject.toml','rb'); tomllib.load(f); print('Build OK: cyrus2/pyproject.toml is valid TOML')\"",
-    "check": "python3 -c \"import tomllib; f=open('cyrus2/pyproject.toml','rb'); tomllib.load(f); print('Check OK: cyrus2/pyproject.toml is valid TOML')\"",
-    "test": "bun test"
-  }
-}

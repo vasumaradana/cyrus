@@ -1,18 +1,7 @@
 ---
 id=001-Create-pyproject-toml-with-ruff-config
 title=Issue 001: Create pyproject.toml with Ruff Config
-state=PLANNED
-parent=
-children=
-split_count=0
-force_split=false
-needs_interview=false
-verify_count=0
-total_input_tokens=375347
-total_output_tokens=128
-total_duration_seconds=985
-total_iterations=79
-run_count=78
+state=GROOMED
 ---
 
 # Issue 001: Create pyproject.toml with Ruff Config
@@ -34,11 +23,11 @@ Create `cyrus2/pyproject.toml` with project metadata and Ruff linting/formatting
 - None
 
 ## Acceptance Criteria
-- [x] File `cyrus2/pyproject.toml` exists with project metadata (name: cyrus, version: 2.0.0, python>=3.10)
-- [x] Ruff config includes rule sets: E, F, W, I, UP, B
-- [x] Target version set to py310, line-length to 88
-- [x] Exclude patterns include `.venv` and `cyrus-companion`
-- [x] Both `[tool.ruff.lint]` and `[tool.ruff.format]` sections present
+- [ ] File `cyrus2/pyproject.toml` exists with project metadata (name: cyrus, version: 2.0.0, python>=3.10)
+- [ ] Ruff config includes rule sets: E, F, W, I, UP, B
+- [ ] Target version set to py310, line-length to 88
+- [ ] Exclude patterns include `.venv` and `cyrus-companion`
+- [ ] Both `[tool.ruff.lint]` and `[tool.ruff.format]` sections present
 
 ## Implementation Steps
 1. Navigate to project root: `cd /home/daniel/Projects/barf/cyrus`

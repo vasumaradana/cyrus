@@ -103,7 +103,7 @@ Launch **only 1 subagent** for build/tests (validation gates)
 - Update the plan file `$PLAN_DIR/$BARF_ISSUE_ID.md`- mark completed tasks
 - Note any discoveries, bugs, or deviations in the plan's Open Questions
 - Update `./CLAUDE.md` with operational learnings (if applicable)
-
+<!-- 
 ### Step 8: Commit
 
 When all validation passes (tests, lint, build):
@@ -112,7 +112,7 @@ When all validation passes (tests, lint, build):
 - Run `git diff` to verify changes are correct
 - Commit with descriptive message following repo conventions
 - Include `Co-Authored-By: Claude <noreply@anthropic.com>`
-- Push changes to repo
+- Push changes to repo -->
 ---
 
 ## Exit Criteria: Implementation Done?
@@ -146,7 +146,7 @@ Before considering work complete, verify:
 
 Violations block merge. Check before committing:
 
-- [ ] Follow ALL rules in `.claude/rules/` (especially `hard-requirements.md`)
+- [ ] Follow ALL rules in `.claude/rules/` 
 - [ ] Use TDD workflow - tests first, then implementation
 - [ ] Verify organization isolation in 80% of integration tests
 - [ ] No hardcoded secrets - use environment variables
