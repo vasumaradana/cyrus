@@ -1,86 +1,70 @@
-# Plan 001: Create pyproject.toml with Ruff Config
+# Implementation Plan: Create pyproject.toml with Ruff Config
 
-## Summary
-
-Create `cyrus2/pyproject.toml` with project metadata and Ruff linting/formatting configuration. This is the foundation file for the Cyrus 2.0 rewrite — all subsequent issues depend on it existing.
+**Issue**: [001-Create-pyproject-toml-with-ruff-config](/home/daniel/Projects/barf/cyrus/issues/001-Create-pyproject-toml-with-ruff-config.md)
+**Created**: 2026-03-16
+**PROMPT**: `/home/daniel/Projects/barf/cyrus/prompts/PROMPT_plan.md`
 
 ## Gap Analysis
 
-| Requirement | Current State | Action |
-|---|---|---|
-| `cyrus2/pyproject.toml` exists | Directory exists, empty | Create file |
-| Project metadata (name, version, python) | Nothing | Add `[project]` section |
-| Ruff rule sets E, F, W, I, UP, B | No linting config anywhere | Add `[tool.ruff.lint]` |
-| target-version py310, line-length 88 | N/A | Add `[tool.ruff]` |
-| Exclude `.venv` and `cyrus-companion` | N/A | Add to `[tool.ruff]` exclude |
-| `[tool.ruff.lint]` section present | N/A | Create section |
-| `[tool.ruff.format]` section present | N/A | Create section |
+**Already exists**: `cyrus2/` directory (empty). Reference docs `docs/17-ruff-linting.md` and `docs/12-code-audit.md` define the desired Ruff configuration. No existing linting, formatting, or packaging config anywhere in the project.
 
-No existing `pyproject.toml` or TOML files exist anywhere in the project. The `cyrus2/` directory exists but is empty.
+**Needs building**: Single file `cyrus2/pyproject.toml` with:
+- `[project]` section — name, version, description, requires-python
+- `[tool.ruff]` section — target-version, line-length, exclude
+- `[tool.ruff.lint]` section — select rule sets
+- `[tool.ruff.format]` section — empty (use defaults)
 
-## Design Decisions
+## Approach
 
-1. **File content matches issue spec exactly** — the issue provides a complete `Config Content Reference` section. No deviations needed; the config aligns with `docs/17-ruff-linting.md`.
+**Write the file verbatim from the issue's Config Content Reference.** The issue provides exact TOML content that also matches `docs/17-ruff-linting.md`. No deviations needed — this is a foundation file that subsequent issues (002-Run-ruff-autofix, 003-Create-requirements-dev-txt) depend on.
 
-2. **Validation approach** — Python's `tomllib` (stdlib in 3.11+, `tomli` backport for 3.10) can validate the TOML. Since the target is `python>=3.10`, we use `tomllib` with a fallback to `tomli` for validation. Simplest: just use `python3 -c "import tomllib; ..."` since the dev machine likely has 3.11+.
+**Why this approach**: Content is fully specified in two sources (issue + docs/17) that agree. Adding anything beyond the spec would risk breaking downstream issue assumptions. The empty `[tool.ruff.format]` section is valid TOML and signals Ruff to use default formatting settings.
 
-3. **No extra sections** — only what the acceptance criteria require. Future issues will add `[project.dependencies]`, `[build-system]`, etc.
+**Validation**: Python's `tomllib` (stdlib since 3.11) validates TOML syntax. The dev machine runs Python 3.11+, so `tomllib` is available even though the project targets `>=3.10`.
 
-## Acceptance Criteria → Test Mapping
+## Rules to Follow
 
-| # | Acceptance Criterion | Verification |
-|---|---|---|
-| AC1 | File exists with project metadata | `test -f cyrus2/pyproject.toml` + parse and check `[project]` fields |
-| AC2 | Ruff rule sets E, F, W, I, UP, B | Parse TOML → assert `tool.ruff.lint.select` equals expected list |
-| AC3 | target-version py310, line-length 88 | Parse TOML → assert `tool.ruff.target-version` and `tool.ruff.line-length` |
-| AC4 | Exclude patterns include .venv and cyrus-companion | Parse TOML → assert `tool.ruff.exclude` contains both |
-| AC5 | Both lint and format sections present | Parse TOML → assert `tool.ruff.lint` and `tool.ruff.format` keys exist |
+- No `.claude/rules/` directory exists in this project — no rule files to reference.
 
-## Implementation Steps
+## Skills & Agents to Use
 
-### Step 1: Create `cyrus2/pyproject.toml`
+| Task | Skill/Agent | Purpose |
+|------|-------------|---------|
+| Create pyproject.toml | Direct file write | Single file, fully specified content — no agent needed |
+| Validate TOML | `python3 -c "import tomllib; ..."` | Verify valid TOML syntax |
+| Verify acceptance criteria | `python3` validation script | Programmatically check all 5 AC |
 
-Write the file with this exact content:
+This issue is simple enough that no subagents or skills are needed.
 
-```toml
-[project]
-name = "cyrus"
-version = "2.0.0"
-description = "Cyrus 2.0 - AI voice assistant with VS Code integration"
-requires-python = ">=3.10"
+## Prioritized Tasks
 
-[tool.ruff]
-target-version = "py310"
-line-length = 88
-exclude = [".venv", "cyrus-companion"]
+- [x] Create `cyrus2/pyproject.toml` with exact content from issue spec
+- [x] Validate TOML syntax with `tomllib`
+- [x] Verify all 5 acceptance criteria programmatically
 
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B"]
+## Acceptance-Driven Tests
 
-[tool.ruff.format]
-```
+| Acceptance Criterion | Required Test | Type |
+|---------------------|---------------|------|
+| AC1: File exists with project metadata (name: cyrus, version: 2.0.0, python>=3.10) | Parse TOML; assert `project.name == "cyrus"`, `project.version == "2.0.0"`, `project.requires-python == ">=3.10"` | verification |
+| AC2: Ruff config includes rule sets: E, F, W, I, UP, B | Parse TOML; assert `tool.ruff.lint.select == ["E", "F", "W", "I", "UP", "B"]` | verification |
+| AC3: Target version py310, line-length 88 | Parse TOML; assert `tool.ruff.target-version == "py310"` and `tool.ruff.line-length == 88` | verification |
+| AC4: Exclude patterns include `.venv` and `cyrus-companion` | Parse TOML; assert both in `tool.ruff.exclude` | verification |
+| AC5: Both `[tool.ruff.lint]` and `[tool.ruff.format]` sections present | Parse TOML; assert `"lint" in data["tool"]["ruff"]` and `"format" in data["tool"]["ruff"]` | verification |
 
-**File path:** `cyrus2/pyproject.toml`
+**No cheating** — cannot claim done without all 5 acceptance criteria verified.
 
-### Step 2: Validate TOML syntax
+### Verification Script
 
 ```bash
 python3 -c "
-import tomllib
-with open('cyrus2/pyproject.toml', 'rb') as f:
-    data = tomllib.load(f)
-print('Valid TOML')
-print('Sections:', list(data.keys()))
-"
-```
+import tomllib, sys, os
 
-### Step 3: Verify all acceptance criteria
+path = 'cyrus2/pyproject.toml'
+if not os.path.isfile(path):
+    print(f'FAIL: {path} does not exist'); sys.exit(1)
 
-```bash
-python3 -c "
-import tomllib, sys
-
-with open('cyrus2/pyproject.toml', 'rb') as f:
+with open(path, 'rb') as f:
     data = tomllib.load(f)
 
 errors = []
@@ -107,16 +91,47 @@ if '.venv' not in exclude: errors.append('.venv not in exclude')
 if 'cyrus-companion' not in exclude: errors.append('cyrus-companion not in exclude')
 
 # AC5: both sections present
-if 'lint' not in data.get('tool', {}).get('ruff', {}): errors.append('lint section missing')
-if 'format' not in data.get('tool', {}).get('ruff', {}): errors.append('format section missing')
+if 'lint' not in ruff: errors.append('lint section missing')
+if 'format' not in ruff: errors.append('format section missing')
 
 if errors:
-    print('FAIL:', errors)
-    sys.exit(1)
-print('All acceptance criteria pass')
+    print('FAIL:', errors); sys.exit(1)
+print('All 5 acceptance criteria PASS')
 "
+```
+
+## Validation (Backpressure)
+
+- **TOML syntax**: `tomllib.load()` must succeed without exceptions
+- **Acceptance criteria**: All 5 must pass via verification script above
+- **No lint/build/test commands**: This is a config file with no code to lint, build, or test. Validation is TOML parsing + AC verification.
+
+## Files to Create/Modify
+
+- `cyrus2/pyproject.toml` — **New file**. Project metadata + Ruff linting/formatting configuration. Foundation for all subsequent Cyrus 2.0 issues.
+
+## File Content
+
+Exact content to write (from issue Config Content Reference):
+
+```toml
+[project]
+name = "cyrus"
+version = "2.0.0"
+description = "Cyrus 2.0 - AI voice assistant with VS Code integration"
+requires-python = ">=3.10"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+exclude = [".venv", "cyrus-companion"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.format]
 ```
 
 ## Risk Assessment
 
-**Low risk.** This is a single new file with no dependencies on existing code. The content is fully specified in the issue. The only failure mode is a TOML syntax error, caught by Step 2.
+**Low risk.** Single new file, no dependencies on existing code, no modifications to existing files. Content is fully specified in the issue. Only failure mode is a TOML syntax error, caught by validation step.

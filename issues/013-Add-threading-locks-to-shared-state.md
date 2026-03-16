@@ -1,18 +1,18 @@
 ---
 id=013-Add-threading-locks-to-shared-state
 title=Issue 013: Add threading locks to shared state
-state=GROOMED
+state=PLANNED
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=54728
-total_output_tokens=3
-total_duration_seconds=41
-total_iterations=1
-run_count=1
+total_input_tokens=130929
+total_output_tokens=29
+total_duration_seconds=410
+total_iterations=70
+run_count=70
 ---
 
 # Issue 013: Add threading locks to shared state
@@ -115,3 +115,694 @@ python -c "from cyrus2.cyrus_brain import _conversation_active; _conversation_ac
 - **Iterations:** 1
 - **Model:** claude-haiku-4-5-20251001
 - **Trigger:** auto/triage
+
+### GROOMED — 2026-03-11 20:23:22Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:23:24Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:23:24Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:23:52Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:24:17Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:24:18Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:24:22Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:24:34Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:24:52Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:25:22Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:25:23Z
+
+- **From:** GROOMED
+- **Duration in stage:** 2s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:25:28Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:25:36Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:25:58Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:26:29Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:26:31Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:26:35Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:26:45Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:27:11Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:27:35Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:27:36Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:27:41Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:27:52Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:28:17Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:28:41Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:28:45Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:28:50Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:28:58Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:29:25Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:29:46Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:29:52Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:29:56Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:30:05Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:30:32Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:30:53Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:30:58Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:31:02Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:31:12Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:31:38Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:32:01Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:32:06Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:32:11Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:32:22Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:32:46Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:33:07Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:33:14Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:33:20Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:33:31Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:33:53Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:34:14Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:34:22Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:34:28Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:34:39Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:35:00Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:35:21Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:35:30Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:35:34Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:35:49Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:36:12Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:36:29Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:36:39Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-11 20:36:43Z
+
+- **From:** GROOMED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### PLANNED — 2026-03-12 01:54:33Z
+
+- **From:** PLANNED
+- **Duration in stage:** 300s
+- **Input tokens:** 76,201 (final context: 76,201)
+- **Output tokens:** 26
+- **Iterations:** 1
+- **Context used:** 38%
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### PLANNED — 2026-03-13 18:11:20Z
+
+- **From:** PLANNED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-13 18:11:20Z
+
+- **From:** PLANNED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-13 18:11:21Z
+
+- **From:** PLANNED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-13 18:11:24Z
+
+- **From:** PLANNED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-13 18:11:35Z
+
+- **From:** PLANNED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-13 18:11:39Z
+
+- **From:** PLANNED
+- **Duration in stage:** 1s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
