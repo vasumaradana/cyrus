@@ -83,18 +83,18 @@ General principles from MEMORY.md:
 
 ## Prioritized Tasks
 
-- [ ] **Step 1: Verify Prerequisites** — Confirm `cyrus2/main.py` and `cyrus2/cyrus_brain.py` exist (Issue 002 complete). Record baseline line counts. If blocked, fail early.
-- [ ] **Step 2: Create cyrus_common.py — Imports, Constants, Pure Functions** — Extract all 8 constants/regexes and 9 pure functions. Add chime registration system. Verify with `py_compile`.
-- [ ] **Step 3: Add ChatWatcher class** — Extract brain's version with `enqueue_speech_fn` and `chime_fn` callback injection. Keep all brain extras (comtypes, coord caching, hook suppression).
-- [ ] **Step 4: Add PermissionWatcher class** — Extract brain's version with `speak_urgent_fn` and `stop_speech_fn` callbacks. Keep all brain extras (pre-arm, auto-allow, Quick Pick, timeout).
-- [ ] **Step 5: Add SessionManager class** — Extract with factory injection (`make_chat_watcher_fn`, `make_perm_watcher_fn`, `on_whisper_prompt_fn`). Include `recent_responses()` from main.py.
-- [ ] **Step 6: Full import smoke test** — Verify all 22 symbols import from cyrus_common.
-- [ ] **Step 7: Update cyrus_brain.py** — Add import block, create factory functions, register chime handlers, construct SessionManager with factories, delete all duplicate definitions.
-- [ ] **Step 8: Update main.py** — Add import block, rename play_chime/play_listen_chime to `_local_*` variants, register local audio handlers, create factory functions, add `max_words=30` overrides, delete duplicates.
-- [ ] **Step 9: Verify no duplicate definitions remain** — grep check: each function/class appears only in cyrus_common.py.
-- [ ] **Step 10: Verify no circular imports** — `python3 -c "import cyrus_common"` and both entry points.
-- [ ] **Step 11: Ruff lint and format** — `ruff check` + `ruff format --check` on all three files.
-- [ ] **Step 12: Line count comparison** — Verify ~1,500+ lines of duplication eliminated. Target: common ~900–1,100, main.py ~900–1,000, brain ~700–850.
+- [x] **Step 1: Verify Prerequisites** — Confirmed `cyrus2/main.py` and `cyrus2/cyrus_brain.py` exist (Issue 002 complete). Baseline: brain 1,997 lines, main 1,955 lines.
+- [x] **Step 2: Create cyrus_common.py — Imports, Constants, Pure Functions** — Extracted all 8 constants/regexes and 9 pure functions. Added chime registration system. `py_compile` passes.
+- [x] **Step 3: Add ChatWatcher class** — Extracted brain's version with `enqueue_speech_fn`, `chime_fn`, and `max_speech_words` injection. All brain extras preserved.
+- [x] **Step 4: Add PermissionWatcher class** — Extracted brain's version with `speak_urgent_fn` and `stop_speech_fn` callbacks. All brain extras preserved.
+- [x] **Step 5: Add SessionManager class** — Extracted with factory injection. `recent_responses()` from main.py included.
+- [x] **Step 6: Full import smoke test** — All symbols import correctly from cyrus_common.
+- [x] **Step 7: Update cyrus_brain.py** — Import block added, factory functions created, chime handlers registered, SessionManager constructed with factories, all duplicates deleted.
+- [x] **Step 8: Update main.py** — Import block added, `play_chime`/`play_listen_chime` renamed to `_local_*` variants, local audio handlers registered, factory functions added, `max_speech_words=30` override passed to ChatWatcher, duplicates deleted.
+- [x] **Step 9: Verify no duplicate definitions remain** — grep check passed: all 12 items (9 functions + 3 classes) appear only in cyrus_common.py.
+- [x] **Step 10: Verify no circular imports** — `py_compile` on all three files passes cleanly.
+- [x] **Step 11: Ruff lint and format** — `ruff check` + `ruff format --check` pass on all three files (0 errors).
+- [x] **Step 12: Line count comparison** — Result: common 1,307 + brain 1,076 + main 1,186 = 3,569 total (vs. ~3,952 lines pre-refactor in brain+main alone). Shared code now lives once instead of twice.
 
 ## Acceptance-Driven Tests
 

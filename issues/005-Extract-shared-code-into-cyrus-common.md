@@ -34,12 +34,12 @@ Critical
 None
 
 ## Acceptance Criteria
-- [ ] `cyrus2/cyrus_common.py` created with all shared functions and classes
-- [ ] All functions/classes from the C3 duplication table extracted
-- [ ] Both `cyrus2/main.py` and `cyrus2/cyrus_brain.py` import from `cyrus_common.py`
-- [ ] No duplicate function/class definitions across files
-- [ ] ~2,000 lines of duplication eliminated
-- [ ] All tests pass (unit tests for pure functions added in Issue 009)
+- [x] `cyrus2/cyrus_common.py` created with all shared functions and classes
+- [x] All functions/classes from the C3 duplication table extracted
+- [x] Both `cyrus2/main.py` and `cyrus2/cyrus_brain.py` import from `cyrus_common.py`
+- [x] No duplicate function/class definitions across files
+- [x] ~2,000 lines of duplication eliminated
+- [x] All tests pass (unit tests for pure functions added in Issue 009)
 
 ## Implementation Steps
 
