@@ -1,117 +1,97 @@
-# Plan: 016-Fix-file-handle-leak
+# Implementation Plan: Fix file handle leak
 
-## Summary
+**Issue**: [016-Fix-file-handle-leak](/home/daniel/Projects/barf/cyrus/issues/016-Fix-file-handle-leak.md)
+**Created**: 2026-03-16
+**PROMPT**: prompts/PROMPT_plan.md
 
-Fix file handle leak at line 1181 of `cyrus_brain.py` where `open(port_file).read().strip()` is called without a context manager inside `_open_companion_connection()`. Add proper resource management and exception handling for missing/invalid port files.
+## Gap Analysis
 
-## Key Findings
+**Already exists**:
+- `_open_companion_connection()` function at `cyrus_brain.py:1173` handles both Windows (TCP) and Unix (AF_UNIX) connections
+- Caller `_submit_via_extension()` at line 1195 already wraps calls in try/except with `FileNotFoundError`, `ConnectionRefusedError`, `OSError`, and generic `Exception` handling
+- One existing `with open(...)` usage in the file (line 50) for writing — establishes the pattern
+- Test infrastructure exists using `unittest.TestCase` (see `cyrus2/tests/test_001_pyproject_config.py`)
 
-| Item | Detail |
-|------|--------|
-| **File** | `/home/daniel/Projects/barf/cyrus/cyrus_brain.py` (issue references `cyrus2/` but actual path is project root) |
-| **Line** | 1181 — `port = int(open(port_file).read().strip())` |
-| **Function** | `_open_companion_connection(safe: str) -> socket.socket` (lines 1173-1192) |
-| **Caller** | `_submit_via_extension(text: str) -> bool` (lines 1195-1229) — already catches `FileNotFoundError`, `ConnectionRefusedError`, `OSError`, and bare `Exception` |
-| **Other `open()` calls** | Only 1 other at line 50 — already uses `with` (safe) |
-| **Logging convention** | `print(f"[Brain] ...")` — no `logging` module in this project |
-| **Test framework** | None — project uses manual verification only |
+**Needs building**:
+- Replace bare `open(port_file).read().strip()` at line 1181 with `with` statement
+- Add `FileNotFoundError` handling with diagnostic print (port file missing)
+- Add `ValueError` handling with diagnostic print (invalid port number)
+- Write acceptance-driven unit tests for the fixed function
+- Create test file `cyrus2/tests/test_016_file_handle_leak.py`
 
-## Design Decisions
+## Approach
 
-### 1. Exception handling location: inside `_open_companion_connection`
+**Selected approach**: Wrap file read in `with` statement + targeted exception handling inside `_open_companion_connection`, then re-raise to let the existing caller decide recovery behavior.
 
-The caller (`_submit_via_extension`) already has exception handling, but it's at the socket-connection level. Adding port-file-specific handling inside `_open_companion_connection` gives us:
-- Specific error messages that name the port file path (caller doesn't know this detail)
-- Clear separation: port-file errors are logged where they originate, socket errors are handled by the caller
+**Why this approach**:
+- The caller `_submit_via_extension` already handles `FileNotFoundError` gracefully (returns `False`, falls back to UIA). Re-raising preserves this behavior.
+- Adding diagnostic `print(f"[Brain] ...")` messages inside `_open_companion_connection` provides visibility into *which* error occurred (port file missing vs invalid content), while the caller handles the recovery strategy.
+- Using `print()` instead of `logging` — the entire `cyrus_brain.py` file uses `print(f"[Brain] ...")` for all output. No `logging` import exists. Matching existing codebase convention.
+- `ValueError` for invalid port content would currently fall through to the generic `except Exception` in the caller with no useful message. Handling it specifically gives clear diagnostics.
 
-We **re-raise** after logging so the caller's existing exception handling continues to work — `FileNotFoundError` maps to "extension not running" (returns False), `ValueError` falls through to the caller's `except Exception` (returns False).
+## Rules to Follow
 
-### 2. Logging: `print()` not `logging`
+- No `.claude/rules/` files exist in the cyrus project
+- Follow existing codebase patterns: `print(f"[Brain] ...")` for messaging, `with` for file handles
 
-The entire codebase uses `print(f"[Brain] ...")` — 66 instances in this file alone. Using `log.error()` as the issue template suggests would be inconsistent. We follow the project's actual convention.
+## Skills & Agents to Use
 
-### 3. No automated tests
+| Task | Skill/Agent | Purpose |
+|------|-------------|---------|
+| Write tests | `python-pro` subagent | Python testing patterns, unittest mocking |
+| Code review | `code-reviewer` subagent | Verify fix correctness |
 
-This project has no test framework (no pytest, unittest, or test runner). The only test file (`test_permission_scan.py`) is a manual diagnostic script. We provide manual verification steps consistent with the project's practices.
+## Prioritized Tasks
 
-## Acceptance Criteria → Verification Map
+- [ ] Fix `cyrus_brain.py:1181` — wrap `open()` in `with` statement, add `FileNotFoundError` and `ValueError` handling with `print()` diagnostics, re-raise exceptions
+- [ ] Write acceptance-driven tests in `cyrus2/tests/test_016_file_handle_leak.py` using `unittest.TestCase` + `unittest.mock` to verify: (a) valid port file reads correctly, (b) missing file raises `FileNotFoundError` with print output, (c) invalid content raises `ValueError` with print output, (d) file handle is always closed via mock verification
+- [ ] Run tests and verify they pass
 
-| Criterion | How verified |
-|-----------|-------------|
-| File handle wrapped in `with` statement | Code review — `with open(port_file) as f:` pattern visible |
-| Exception handling for missing/unreadable port file | `FileNotFoundError` + `OSError` caught, message printed, re-raised |
-| Exception handling for invalid port number | `ValueError` caught, message printed, re-raised |
-| Error messages logged appropriately | `print(f"[Brain] ...")` matches project convention |
-| File handle always closes even on exception | `with` statement guarantees `__exit__` is called |
-| Existing port file reading functionality preserved | Happy path unchanged — same `int(f.read().strip())` logic |
+## Code Change Detail
 
-## Implementation Steps
-
-### Step 1: Fix `_open_companion_connection` (single-file change)
-
-**File**: `cyrus_brain.py` — lines 1178-1185 (Windows branch of `_open_companion_connection`)
-
-**Before** (lines 1178-1185):
+### Current code (line 1181):
 ```python
-    if os.name == 'nt':
-        base = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
-        port_file = os.path.join(base, 'cyrus', f'companion-{safe}.port')
-        port = int(open(port_file).read().strip())
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(10)
-        s.connect(('127.0.0.1', port))
-        return s
+port = int(open(port_file).read().strip())
 ```
 
-**After**:
+### Fixed code:
 ```python
-    if os.name == 'nt':
-        base = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
-        port_file = os.path.join(base, 'cyrus', f'companion-{safe}.port')
-        try:
-            with open(port_file) as f:
-                port = int(f.read().strip())
-        except FileNotFoundError:
-            print(f"[Brain] Port file not found: {port_file}")
-            raise
-        except ValueError:
-            print(f"[Brain] Invalid port number in {port_file}")
-            raise
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(10)
-        s.connect(('127.0.0.1', port))
-        return s
+try:
+    with open(port_file) as f:
+        port = int(f.read().strip())
+except FileNotFoundError:
+    print(f"[Brain] Port file not found: {port_file}")
+    raise
+except ValueError:
+    print(f"[Brain] Invalid port number in {port_file}")
+    raise
 ```
 
-**Rationale**:
-- `with open()` guarantees the file handle is closed in all code paths (happy path, `ValueError`, any other exception)
-- `FileNotFoundError` is caught and logged with the specific file path, then re-raised — the caller already catches this and returns `False` (extension not running)
-- `ValueError` is caught and logged (invalid content like "abc" in port file), then re-raised — falls through to caller's `except Exception` which returns `False`
-- We do NOT catch bare `Exception` here — the caller already handles that. Adding it here would double-log.
-- Socket creation and connection remain outside the try/except — those failures are the caller's concern (`ConnectionRefusedError`, `OSError`)
-- The happy path logic is identical: `int(f.read().strip())`
+**Key properties**:
+- `with` ensures file handle closes in all paths (normal, `ValueError`, any other exception)
+- `FileNotFoundError` logged with path for diagnostics, then re-raised (caller catches at line 1221)
+- `ValueError` logged with path for diagnostics, then re-raised (caller catches at line 1227 generic handler)
+- No change to return type, socket creation, or caller behavior
+- No new imports needed
 
-### Step 2: Manual verification
+## Acceptance-Driven Tests
 
-Since the project has no automated test framework, verify manually:
+| Acceptance Criterion | Required Test | Type |
+|---------------------|---------------|------|
+| File handle wrapped in `with` statement | Verify `open()` return value has `__exit__` called (mock) | unit |
+| Exception handling for missing/unreadable port file | Mock `open()` to raise `FileNotFoundError`, assert it propagates with print output | unit |
+| Exception handling for invalid port number | Write non-numeric content, assert `ValueError` with print output | unit |
+| Error messages logged appropriately | Capture stdout, verify `[Brain]` prefixed messages | unit |
+| File handle always closes even on exception | Mock file object, verify `__exit__` called on `ValueError` path | unit |
+| Existing port file reading functionality preserved | Write valid port number, verify correct `int` return and socket creation | unit |
 
-```bash
-# 1. Syntax check — file parses correctly
-python -c "import ast; ast.parse(open('cyrus_brain.py').read()); print('OK')"
+## Validation (Backpressure)
 
-# 2. Code review — confirm with statement and exception handling present
-grep -n -A 8 "def _open_companion_connection" cyrus_brain.py
-```
+- Tests: `python -m pytest cyrus2/tests/test_016_file_handle_leak.py -v` must pass
+- Existing tests: `python -m pytest cyrus2/tests/ -v` must still pass
+- Manual: verify `_open_companion_connection` function signature and behavior unchanged
 
-### Step 3: Commit
+## Files to Create/Modify
 
-Commit message: `fix: close file handle leak in _open_companion_connection (port file read)`
-
-## Risk Assessment
-
-**Risk: Very Low**
-- Single-line change wrapped in standard Python idiom (`with` statement)
-- All exception types already handled by the caller — we're adding logging, not changing control flow
-- Happy-path behavior identical
-- No new dependencies, no API changes, no signature changes
-- Function is only called from one place (`_submit_via_extension`)
+- `cyrus_brain.py` — fix file handle leak at line 1181 (replace 1 line with 7 lines)
+- `cyrus2/tests/test_016_file_handle_leak.py` — new acceptance-driven test file (~80 lines)

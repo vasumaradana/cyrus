@@ -1,293 +1,206 @@
-# Implementation Plan: Break up `_execute_cyrus_command` into dispatch table
+# Implementation Plan: Break up execute_cyrus_command into dispatch table
 
 **Issue**: [007-Break-up-execute-cyrus-command-into-dispatch-table](/home/daniel/Projects/barf/cyrus/issues/007-Break-up-execute-cyrus-command-into-dispatch-table.md)
 **Created**: 2026-03-16
-**PROMPT**: Plan phase — manual Claude Code session
+**PROMPT**: `/home/daniel/Projects/barf/cyrus/prompts/PROMPT_plan.md`
 
 ## Gap Analysis
 
 **Already exists**:
-- `_execute_cyrus_command()` in `cyrus_brain.py` (lines 331–399) — 69-line if/elif chain handling 6 command types
-- `_fast_command()` (lines 290–328) — regex parser that detects commands and returns `{"type": "...", ...}` dicts
-- `_resolve_project()` (line 123) — alias resolution helper
-- `SessionManager` class (lines 1027–1103) — methods: `aliases`, `on_session_switch`, `last_response`, `rename_alias`
-- Module globals with thread-safe locks: `_active_project`, `_project_locked`, `_speak_queue`, `_send()`
-- Single call site at line 1521 in `routing_loop`
+- `_execute_cyrus_command()` in `cyrus_brain.py` lines 331–399 (69 lines, 6 elif branches)
+- 6 command types: `switch_project`, `unlock`, `which_project`, `last_message`, `rename_session`, `pause`
+- Thread-safe globals: `_active_project` + `_active_project_lock`, `_project_locked` + `_project_locked_lock`
+- Helper functions: `_resolve_project()`, `_send()`, `_send_threadsafe()`
+- Single call site at line 1521 in `_brain_listener()`
+- Test framework: `unittest` (stdlib), pattern established in `cyrus2/tests/test_001_pyproject_config.py`
 
 **Needs building**:
-- 6 handler functions (`_handle_switch_project`, `_handle_unlock`, `_handle_which_project`, `_handle_last_message`, `_handle_rename_session`, `_handle_pause`)
-- `_COMMAND_HANDLERS` dispatch dict with `CommandHandler` type alias
-- `logging` import + `logger` module-level variable (currently not imported)
-- Refactored `_execute_cyrus_command()` using dispatch lookup + try/except
+- `CommandResult` dataclass — typed return from handlers (eliminates global mutation in handlers)
+- 6 handler functions extracted from if/elif chain
+- `_COMMAND_HANDLERS` dispatch dict mapping command type strings → handler functions
+- Refactored `_execute_cyrus_command()` using dispatch + result application
+- `logging` calls in each handler and dispatcher
+- `try/except` error handling in dispatcher
+- Unit tests for all 6 handlers + dispatcher
 
-**Path discrepancy**: Issue references `cyrus2/` paths but actual source lives at project root (`/home/daniel/Projects/barf/cyrus/`). The `cyrus2/` directory contains only `pyproject.toml`. `cyrus_common.py` does not exist. This plan operates on root-level `cyrus_brain.py`.
+**Blocker note**: Issue 005 is PLANNED (not complete). `cyrus2/cyrus_common.py` does not exist. The issue says handlers go in "cyrus_common.py or cyrus_brain.py if brain-specific." Since all handlers reference brain-specific globals (`_active_project`, `_project_locked`, `_speak_queue`, `_send()`), handlers stay in **`cyrus_brain.py`** for now. When Issue 005 later extracts shared code, handlers that become generic can be relocated.
 
-**Actual function size**: Issue says "678–776 line monolith" but that's the original pre-refactor line range (331–1107) including ChatWatcher/PermissionWatcher/SessionManager. Actual `_execute_cyrus_command()` is ~69 lines. Refactor is still valuable for testability, extensibility, error handling, and complexity reduction.
+**Code audit correction**: The code audit (C1) claims `_execute_cyrus_command()` spans lines 331–1107 (776 lines). This is **incorrect** — it measured from the function start to the end of `SessionManager` class at line ~1107. The actual function is 69 lines (331–399). The refactoring is still valuable for testability, extensibility, and error handling, even though the function is shorter than the audit suggested.
 
 ## Approach
 
-**Dispatch table pattern** — Replace the if/elif chain with a `dict[str, Callable]` mapping command type strings to small handler functions. Each handler has a uniform signature and returns spoken text (or `""` to suppress TTS). The dispatcher does a single lookup, wraps the call in try/except, and enqueues TTS if the handler returns non-empty text.
+**Strategy**: Return-value-based command pattern. Handlers receive immutable state snapshots and return a `CommandResult` describing what changed. The dispatcher handles lock acquisition, state mutation, and TTS queueing.
 
 **Why this approach**:
-- **Testability**: Each handler can be unit-tested independently with mock globals
-- **Extensibility**: Adding a new command = writing a function + one dict entry
-- **Error handling**: Single try/except in dispatcher replaces silent failures
-- **Complexity**: Each handler CC ≤ 3 vs. the current monolithic chain
+1. **Testability** — Handlers are pure functions of their inputs; no global mutations to mock. Tests pass state in, assert on returned `CommandResult`.
+2. **Thread safety** — Lock acquisition is centralized in the dispatcher, not scattered across 6 handlers. Eliminates risk of lock misuse in new handlers.
+3. **Extensibility** — Adding a new command = write a handler function + add one entry to `_COMMAND_HANDLERS`. No touching the dispatcher.
+4. **Error handling** — Single `try/except` in dispatcher catches all handler failures. Currently handlers have zero error handling.
 
-### Key Design Decisions
+### Handler Contract
 
-**D1. Handlers stay in `cyrus_brain.py`** — Every handler accesses brain-specific module globals (`_active_project`, `_project_locked`, `_speak_queue`, `_send`). Moving them to `cyrus_common.py` (which doesn't exist) would require injecting all state via callbacks for 5–15 line functions. If Issue 005 later extracts shared code, handler calls change from local to imported — trivial follow-up.
-
-**D2. Uniform handler signature with `str` return**:
 ```python
-def _handle_xxx(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                loop: asyncio.AbstractEventLoop) -> str:
+@dataclass
+class CommandResult:
+    """Return value from command handlers."""
+    spoken: str | None = None       # Text to speak via TTS
+    speak_project: str = ""         # Project name for speak queue (default: empty)
+    new_active_project: str | None = None   # Set to update _active_project
+    new_project_locked: bool | None = None  # Set to update _project_locked
+    skip_tts: bool = False          # True to skip TTS queueing entirely
+    log_message: str = ""           # Print to console
 ```
-Return `""` = handler already handled speech (or doesn't need any). This replaces `return` early-exit pattern.
 
-**D3. Logging in handlers, prints untouched elsewhere** — New handler functions use `logging` only. Existing prints outside handlers left for Issue 010 scope.
+Handler signature: `(cmd: dict, spoken: str, session_mgr, loop, active_project: str) -> CommandResult`
 
-**D4. Error handling in dispatcher, not each handler** — Single try/except wraps each handler call. `logger.exception()` includes full traceback.
+- `cmd` — command payload dict from Claude decision
+- `spoken` — TTS fallback text from Claude decision
+- `session_mgr` — SessionManager instance
+- `loop` — asyncio event loop for cross-thread scheduling
+- `active_project` — snapshot of `_active_project` (read under lock by dispatcher)
 
-**D5. No state object extraction** — YAGNI for 5–15 line functions in the same module as globals. Locks already provide thread safety. `unittest.mock.patch` handles test isolation.
+### Dispatcher Flow
 
-**D6. Type-annotated dispatch table**:
-```python
-CommandHandler = Callable[[dict, str, "SessionManager", asyncio.AbstractEventLoop], str]
-_COMMAND_HANDLERS: dict[str, CommandHandler] = { ... }
+```
+1. Look up handler in _COMMAND_HANDLERS
+2. Read _active_project under lock → pass as snapshot
+3. Call handler in try/except
+4. Apply state mutations under locks (new_active_project, new_project_locked)
+5. Queue TTS unless skip_tts
+6. Print log_message
 ```
 
 ## Rules to Follow
 
-- No `.claude/rules/` directory exists in the cyrus project
-- Follow existing code patterns in `cyrus_brain.py`: thread-safe global access via locks, `asyncio.run_coroutine_threadsafe` for async calls from sync context
-- Preserve all original behavior — no logic changes
-- Use `ruff` for linting/formatting if available (`cyrus2/pyproject.toml` has ruff config)
+No `.claude/rules/` files exist in this project. General principles:
+- **Fix everything you see** — if lint/type/test issues encountered, fix them
+- **No arbitrary values** — use standard constants
+- **Preserve original behavior** — dispatch refactoring must be behavior-preserving
 
 ## Skills & Agents to Use
 
 | Task | Skill/Agent | Purpose |
 |------|-------------|---------|
-| Implementation | `python-pro` agent (`.claude/agents/python-pro.md`) | Python 3.11+ specialist for the refactoring |
-| Verification | Bash subagent | Run `py_compile`, ruff checks, and dispatch table validation |
+| Extract handler functions and create dispatch table | `refactoring-specialist` subagent | Systematic code extraction with behavior preservation |
+| Write unit tests for all handlers | `test-automator` subagent | Acceptance-driven test creation |
+| Lint and complexity validation | `ruff` + `radon` CLI tools | Verify lint passes and cyclomatic complexity < 5 |
 
 ## Prioritized Tasks
 
-- [ ] **Add imports**: `import logging`, `from typing import Callable`, and `logger = logging.getLogger(__name__)` near top of `cyrus_brain.py`
-- [ ] **Create 6 handler functions** immediately before `_execute_cyrus_command()` (before line 331):
-  - `_handle_switch_project` — lock routing to named project (CC=2)
-  - `_handle_unlock` — release project lock (CC=1)
-  - `_handle_which_project` — report active project + lock status (CC=1)
-  - `_handle_last_message` — replay last response via TTS (CC=2)
-  - `_handle_rename_session` — rename session alias (CC=3)
-  - `_handle_pause` — delegate pause to voice service (CC=1)
-- [ ] **Create dispatch table** `_COMMAND_HANDLERS` with `CommandHandler` type alias after handlers
-- [ ] **Refactor `_execute_cyrus_command()`** to use dispatch lookup + try/except + conditional TTS enqueue
-- [ ] **Lint and format** with `ruff check` / `ruff format` (or `py_compile` fallback)
-- [ ] **Verify behavior preservation**: dispatch table has all 6 types, all handlers callable with docstrings
-- [ ] **Verify cyclomatic complexity** < 5 per function (all handlers CC ≤ 3, dispatcher CC = 3)
+- [ ] **Step 1: Define CommandResult dataclass** — Add `CommandResult` dataclass above `_execute_cyrus_command()` in `cyrus_brain.py`. Fields: `spoken`, `speak_project`, `new_active_project`, `new_project_locked`, `skip_tts`, `log_message`. Add `from dataclasses import dataclass` import if not present.
 
-## Handler Implementations
+- [ ] **Step 2: Extract 6 handler functions** — Create these functions in `cyrus_brain.py` directly above the dispatch table:
+  - `_handle_switch_project(cmd, spoken, session_mgr, loop, active_project) -> CommandResult`
+  - `_handle_unlock(cmd, spoken, session_mgr, loop, active_project) -> CommandResult`
+  - `_handle_which_project(cmd, spoken, session_mgr, loop, active_project) -> CommandResult`
+  - `_handle_last_message(cmd, spoken, session_mgr, loop, active_project) -> CommandResult`
+  - `_handle_rename_session(cmd, spoken, session_mgr, loop, active_project) -> CommandResult`
+  - `_handle_pause(cmd, spoken, session_mgr, loop, active_project) -> CommandResult`
+  - Each handler must be < 50 lines (current branches are 4–14 lines, so this is trivially satisfied)
+  - Each handler returns `CommandResult` — no `global` statements, no direct lock access
+  - Add `logging.debug()` on entry, `logging.info()` on success, `logging.warning()` on failure
 
-### Command types (from current code lines 335–395):
+- [ ] **Step 3: Create dispatch table** — Define `_COMMAND_HANDLERS: dict[str, Callable]` mapping all 6 command type strings to handler functions. Place immediately after the handler definitions.
 
-| Command Type | Lines | CC | Globals Accessed |
-|---|---|---|---|
-| `switch_project` | 335–347 | 3→2 | `_active_project` (write), `_project_locked` (write) |
-| `unlock` | 349–353 | 1 | `_project_locked` (write) |
-| `which_project` | 355–362 | 1 | `_active_project` (read), `_project_locked` (read) |
-| `last_message` | 364–375 | 2 | `_active_project` (read), `_speak_queue` (write) |
-| `rename_session` | 377–390 | 3 | `_active_project` (read) |
-| `pause` | 392–395 | 1 | none (sends via `_send`) |
+- [ ] **Step 4: Refactor _execute_cyrus_command()** — Replace the 6-branch if/elif chain with:
+  1. Look up handler via `_COMMAND_HANDLERS.get(ctype)`
+  2. Read `_active_project` under `_active_project_lock` → pass as `active_project` param
+  3. Call handler in `try/except Exception` — log exception on failure
+  4. Apply `result.new_active_project` under `_active_project_lock` if not None
+  5. Apply `result.new_project_locked` under `_project_locked_lock` if not None
+  6. If `not result.skip_tts` and `result.spoken`: queue `(result.speak_project, result.spoken)` to `_speak_queue`
+  7. Print `result.log_message` if set
+  - **Critical**: `last_message` handler queues `(proj_name, resp)` not `("", spoken)` — use `speak_project` field
+  - **Critical**: `pause` handler calls `asyncio.run_coroutine_threadsafe(_send(...), loop)` — use `skip_tts=True`
+  - Remove `global _active_project, _project_locked` from function (dispatcher handles state)
 
-**Tail behavior** (lines 397–398): `if spoken: asyncio.run_coroutine_threadsafe(_speak_queue.put(("", spoken)), loop)`. Handlers `last_message` and `pause` currently `return` early to skip this. In the new design, they return `""` instead.
+- [ ] **Step 5: Add logging import and calls** — Ensure `import logging` at module top. Add:
+  - `logging.debug("Executing command '%s'", ctype)` at dispatcher entry
+  - `logging.info("Command '%s' completed", ctype)` after successful handler call
+  - `logging.exception("Error executing command '%s'", ctype)` in except block
+  - `logging.warning("Unknown command type: '%s'", ctype)` for missing handler
 
-### Exact handler code
+- [ ] **Step 6: Create unit tests** — Create `cyrus2/tests/test_007_command_handlers.py`:
+  - Follow existing pattern: `unittest.TestCase` classes, docstrings referencing ACs
+  - Test each handler independently with mock `session_mgr`, mock `loop`
+  - Test dispatcher dispatch logic (known + unknown command types)
+  - Test error handling (handler that raises → exception logged, no crash)
+  - Tests must not require Windows-specific deps (UIA, comtypes) — handlers are pure logic
 
-See the 6 handler functions, dispatch table, and refactored dispatcher in the **Detailed Implementation** section below.
-
-<details>
-<summary>Detailed Implementation (click to expand)</summary>
-
-#### Step 1: Add imports (after line 34, near existing imports)
-
-```python
-import logging
-from typing import Callable
-
-logger = logging.getLogger(__name__)
-```
-
-Note: `logging` is NOT currently imported. `from typing import Callable` is new.
-
-#### Step 2: Handler functions (insert before line 331)
-
-```python
-# ── Command handlers ──────────────────────────────────────────────────────────
-
-def _handle_switch_project(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                           loop: asyncio.AbstractEventLoop) -> str:
-    """Lock routing to a named project."""
-    global _active_project, _project_locked
-    target = _resolve_project(cmd.get("project", ""), session_mgr.aliases)
-    if target:
-        with _active_project_lock:
-            _active_project = target
-        with _project_locked_lock:
-            _project_locked = True
-        session_mgr.on_session_switch(target, loop)
-        spoken = spoken or f"Switched to {target}. Routing locked."
-        logger.info("Switch project: %s", spoken)
-    else:
-        spoken = f"No session matching '{cmd.get('project', '')}' found."
-        logger.info("Switch project failed: %s", spoken)
-    return spoken
-
-
-def _handle_unlock(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                   loop: asyncio.AbstractEventLoop) -> str:
-    """Release project lock, return to auto-follow mode."""
-    global _project_locked
-    with _project_locked_lock:
-        _project_locked = False
-    spoken = spoken or "Following window focus."
-    logger.info("Routing unlocked.")
-    return spoken
-
-
-def _handle_which_project(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                          loop: asyncio.AbstractEventLoop) -> str:
-    """Report current active project and lock status."""
-    with _active_project_lock:
-        proj_name = _active_project
-    with _project_locked_lock:
-        locked = _project_locked
-    status = "locked" if locked else "following focus"
-    spoken = spoken or f"Active project: {proj_name or 'none'}, {status}."
-    logger.info("Which project: %s", spoken)
-    return spoken
-
-
-def _handle_last_message(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                         loop: asyncio.AbstractEventLoop) -> str:
-    """Replay the last response in the active session."""
-    with _active_project_lock:
-        proj_name = _active_project
-    resp = session_mgr.last_response(proj_name)
-    if resp:
-        asyncio.run_coroutine_threadsafe(
-            _speak_queue.put((proj_name, resp)), loop
-        )
-        logger.info("Replaying last message for %s", proj_name or "active session")
-        return ""  # speech already enqueued
-    spoken = spoken or f"No recorded response for {proj_name or 'this session'}."
-    logger.info("Last message: %s", spoken)
-    return spoken
-
-
-def _handle_rename_session(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                           loop: asyncio.AbstractEventLoop) -> str:
-    """Rename a session alias."""
-    new_name = cmd.get("new", "").strip()
-    old_hint = cmd.get("old", "").strip()
-    with _active_project_lock:
-        active = _active_project
-    proj = _resolve_project(old_hint, session_mgr.aliases) if old_hint else active
-    if proj and new_name:
-        old_alias = next((a for a, p in session_mgr.aliases.items() if p == proj), proj)
-        session_mgr.rename_alias(old_alias, new_name, proj)
-        spoken = spoken or f"Renamed to '{new_name}'."
-        logger.info("%s -> alias '%s'", proj, new_name)
-    else:
-        spoken = spoken or "Could not find that session to rename."
-        logger.info("Rename failed: %s", spoken)
-    return spoken
-
-
-def _handle_pause(cmd: dict, spoken: str, session_mgr: "SessionManager",
-                  loop: asyncio.AbstractEventLoop) -> str:
-    """Toggle listening pause state — delegates to voice service."""
-    asyncio.run_coroutine_threadsafe(_send({"type": "pause"}), loop)
-    logger.debug("Pause command sent to voice service")
-    return ""  # voice service handles the response
-```
-
-#### Step 3: Dispatch table (insert after handlers, before `_execute_cyrus_command`)
-
-```python
-CommandHandler = Callable[[dict, str, "SessionManager", asyncio.AbstractEventLoop], str]
-
-_COMMAND_HANDLERS: dict[str, CommandHandler] = {
-    "switch_project": _handle_switch_project,
-    "unlock":         _handle_unlock,
-    "which_project":  _handle_which_project,
-    "last_message":   _handle_last_message,
-    "rename_session": _handle_rename_session,
-    "pause":          _handle_pause,
-}
-```
-
-#### Step 4: Refactored dispatcher (replace lines 331–399)
-
-```python
-def _execute_cyrus_command(ctype: str, cmd: dict, spoken: str,
-                            session_mgr: "SessionManager",
-                            loop: asyncio.AbstractEventLoop) -> None:
-    """Execute a Cyrus meta-command via dispatch table."""
-    handler = _COMMAND_HANDLERS.get(ctype)
-    if handler is None:
-        logger.warning("Unknown command type: %s", ctype)
-        return
-
-    logger.debug("Executing command: %s", ctype)
-    try:
-        result_spoken = handler(cmd, spoken, session_mgr, loop)
-    except Exception:
-        logger.exception("Error executing command '%s'", ctype)
-        return
-
-    if result_spoken:
-        asyncio.run_coroutine_threadsafe(
-            _speak_queue.put(("", result_spoken)), loop
-        )
-```
-
-</details>
+- [ ] **Step 7: Validate** — Run:
+  - `ruff check cyrus_brain.py` (no new lint issues)
+  - `ruff format --check cyrus_brain.py` (properly formatted)
+  - `python3 -m py_compile cyrus_brain.py` (compiles)
+  - `python3 -m pytest cyrus2/tests/test_007_command_handlers.py -v` (all tests pass)
+  - `radon cc cyrus_brain.py -a -nc` (cyclomatic complexity per handler < 5, if radon available)
 
 ## Acceptance-Driven Tests
 
 | Acceptance Criterion | Required Test | Type |
 |---------------------|---------------|------|
-| `_execute_cyrus_command()` refactored into `_COMMAND_HANDLERS` dispatch dict | Verify `_COMMAND_HANDLERS` is a dict with 6 entries, dispatcher uses `.get()` lookup | verification script |
-| Each handler < 50 lines, single command type | Verify longest handler (`_handle_rename_session`) is ~14 lines | code inspection |
-| All original behavior preserved (no logic changes) | 1:1 comparison of handler logic vs original if/elif branches | code review + verification script |
-| Unit tests for each handler (Issue 009) | **Deferred** — handlers have clean uniform signatures for testing. Test file creation is Issue 009 scope. | deferred |
-| Cyclomatic complexity per function < 5 | `radon cc` or manual verification: all handlers CC ≤ 3, dispatcher CC = 3 | verification script |
-| Error handling: specific exceptions logged, not silently swallowed | Verify try/except with `logger.exception()` in dispatcher, `logger.warning()` for unknown commands | code inspection |
+| `_execute_cyrus_command()` refactored into dispatch dict `_COMMAND_HANDLERS` | Test that `_COMMAND_HANDLERS` is a dict with 6 entries; keys match expected command types | unit |
+| Each handler < 50 lines and handles single command type | AST-based line count check for each `_handle_*` function | unit |
+| All original behavior preserved | Test each handler returns correct `CommandResult` for normal inputs (switch found/not-found, unlock, which, last_message found/not-found, rename success/fail, pause) | unit |
+| Unit tests added for each handler | 6+ test classes, one per handler, with at least 2 test cases each (success + failure/edge) | unit |
+| Cyclomatic complexity per function < 5 | `radon cc` check or AST-based branch counting | verification |
+| Error handling improved: specific exceptions logged | Test that dispatcher catches handler exceptions and logs them (mock `logging.exception`) | unit |
 
-**Note**: No pytest framework exists yet (Issue 018). The "unit tests for each handler" criterion explicitly defers to Issue 009. This plan makes handlers testable but does not create the test file.
+**No cheating** — cannot claim done without all tests passing and complexity verified.
 
 ## Validation (Backpressure)
 
-- **Compile check**: `python -m py_compile cyrus_brain.py` must pass
-- **Lint**: `ruff check cyrus_brain.py` must pass (or `py_compile` if ruff unavailable)
-- **Format**: `ruff format cyrus_brain.py` must not produce errors
-- **Dispatch table verification**: All 6 command types present, all handlers callable with docstrings
-- **Complexity**: All handlers CC < 5 (verified via `radon cc` or manual inspection)
-- **Behavior preservation**: Original if/elif branches map 1:1 to handler functions
+- **Compile**: `python3 -m py_compile cyrus_brain.py`
+- **Lint**: `ruff check cyrus_brain.py` (no new issues)
+- **Format**: `ruff format --check cyrus_brain.py`
+- **Tests**: `python3 -m pytest cyrus2/tests/test_007_command_handlers.py -v` (all pass)
+- **Complexity**: `radon cc cyrus_brain.py -s -n C` (no function rated C or worse — all A or B)
+- **Dispatch completeness**: grep check — `_COMMAND_HANDLERS` contains all 6 command types
+- **No residual elif chain**: grep `elif ctype ==` in `_execute_cyrus_command` → 0 matches
 
 ## Files to Create/Modify
 
-- **Modify**: `/home/daniel/Projects/barf/cyrus/cyrus_brain.py` — add imports, handler functions, dispatch table, refactor `_execute_cyrus_command()`
+- **Modify**: `cyrus_brain.py` — Add `CommandResult` dataclass, 6 `_handle_*` functions, `_COMMAND_HANDLERS` dict, refactor `_execute_cyrus_command()`, add logging (~80 lines added, ~55 lines of if/elif removed)
+- **Create**: `cyrus2/tests/test_007_command_handlers.py` — Unit tests for all handlers and dispatcher (~200–300 lines)
 
-No new files needed. Test file creation is Issue 009 scope.
+## Design Decisions
 
-## Risk Notes
+### D1. Handlers stay in cyrus_brain.py (not cyrus_common.py)
+Issue 005 hasn't created `cyrus_common.py` yet, and all handlers reference brain-specific state (`_active_project`, `_project_locked`, `_speak_queue`, `_send()`). The issue explicitly allows "cyrus_brain.py if brain-specific." When Issue 005 later extracts shared code, handlers can be relocated if they become generic.
 
-1. **Issues 005/006 still PLANNED**: All dependencies (`_resolve_project`, `_fast_command`, `SessionManager`, globals) remain inline in `cyrus_brain.py`. If 005 later extracts to `cyrus_common.py`, handler calls change from local to imported — trivial follow-up.
+### D2. CommandResult return type (not global mutation)
+Handlers return a `CommandResult` dataclass describing intent. The dispatcher applies state changes under locks. This makes handlers testable as pure functions and centralizes thread-safety logic. Alternative considered: pass locks directly to handlers — rejected because it scatters thread-safety concerns and makes testing harder.
 
-2. **Uniform signature with unused params**: Some handlers don't use all parameters (`_handle_unlock` ignores `cmd`, `session_mgr`). Intentional for dispatch table pattern. If ruff flags unused params, prefix with `_` in those specific handlers.
+### D3. Uniform handler signature
+All handlers accept `(cmd, spoken, session_mgr, loop, active_project)` even if some don't use all params. This enables the dispatch table pattern without per-handler argument unpacking. The slight waste of passing unused params is worth the consistency.
 
-3. **`_send` vs `_send_threadsafe`**: `pause` handler uses `_send()` (async coroutine via `run_coroutine_threadsafe`), matching original code. `_send_threadsafe` is a sync wrapper used elsewhere.
+### D4. `speak_project` field in CommandResult
+The `last_message` handler needs to queue `(proj_name, resp)` to `_speak_queue` (not `("", spoken)` like other commands). Rather than special-casing in the dispatcher, `CommandResult.speak_project` lets any handler specify the project name for TTS routing.
 
-4. **Logging configuration**: `logger = logging.getLogger(__name__)` works with any config. `main()` should configure `logging.basicConfig()` — that's Issue 010's scope.
+### D5. rename_session included (not in issue's command list)
+The issue lists 5 command types but the actual code has 6 (including `rename_session`). Including it because "all original behavior preserved" is an acceptance criterion.
+
+### D6. Tests don't require Windows runtime
+Command handlers are pure logic operating on passed-in state. Tests mock `session_mgr` and `loop` with simple objects/MagicMock. No UIA, comtypes, or Windows-specific imports needed.
+
+## Risk Assessment
+
+| Risk | Impact | Likelihood | Mitigation |
+|------|--------|------------|------------|
+| `last_message` TTS routing broken (uses project-specific queue entry) | Medium | Medium | `speak_project` field in CommandResult + explicit test case |
+| `pause` handler side-effect (`_send()`) not captured by CommandResult | Low | Low | Handler calls `_send()` directly; `skip_tts=True` prevents double-queueing |
+| Thread safety regression (locks not acquired correctly) | High | Low | Dispatcher is sole lock holder; code review + test for lock order |
+| `rename_session` print at line 390 runs even on failure | Low | Low | Existing bug — fix in handler by conditionalizing the print |
+| Test imports fail on non-Windows (cyrus_brain.py imports comtypes at module level) | Medium | High | Tests import only the handler functions/CommandResult, not the whole module. Use `sys.path` manipulation or mock imports |
+
+## Handler Extraction Reference
+
+Current code → handler mapping (cyrus_brain.py lines 331–399):
+
+| Branch | Lines | Key Operations | Special TTS |
+|--------|-------|---------------|-------------|
+| `switch_project` | 335–347 | `_resolve_project()`, set globals, `on_session_switch()` | Normal (`("", spoken)`) |
+| `unlock` | 349–353 | Set `_project_locked = False` | Normal |
+| `which_project` | 355–362 | Read both globals, build status string | Normal |
+| `last_message` | 364–375 | Read `_active_project`, `last_response()` | **Special**: `(proj_name, resp)` if found; Normal if not |
+| `rename_session` | 377–390 | `_resolve_project()`, `rename_alias()` | Normal |
+| `pause` | 392–395 | `_send({"type": "pause"})` | **Skip TTS entirely** |

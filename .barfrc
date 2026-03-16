@@ -30,6 +30,10 @@ LOG_FILE=.barf/barf.jsonl
 LOG_LEVEL=trace
 LOG_PRETTY=false
 
+BUILD_COMMAND=python -m ruff check .
+CHECK_COMMAND=python -m ruff format --check .
+TEST_COMMAND=python -m pytest
+
 SENTRY_DSN=https://fb270d753847029787e0494c6fdc9af2@o4506185205678080.ingest.us.sentry.io/4511037813620736
 SENTRY_ENVIRONMENT=dev
 SENTRY_TRACES_SAMPLE_RATE=0.2
