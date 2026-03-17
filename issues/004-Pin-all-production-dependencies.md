@@ -1,7 +1,7 @@
 ---
 id=004-Pin-all-production-dependencies
 title=Issue 004: Pin All Production Dependencies
-state=PLANNED
+state=BUILT
 parent=
 children=
 split_count=0
@@ -36,13 +36,13 @@ Pinning all production dependencies to exact versions ensures reproducible build
 - None (but Issue 002 should be complete for consistency)
 
 ## Acceptance Criteria
-- [] `cyrus2/requirements.txt` exists with exact pinned versions (7 packages — see plan ambiguity resolution)
-- [] `cyrus2/requirements-voice.txt` exists with exact pinned versions (10 packages)
-- [] `cyrus2/requirements-brain.txt` exists with exact pinned versions (17 packages — superset)
-- [] All versions obtained from latest stable PyPI (no working pip freeze env available; versions verified 2026-03-16)
-- [] torch, faster-whisper, onnxruntime-gpu have confirmed compatible versions (CUDA 12.x + cuDNN 9 chain)
-- [] Each file can be installed with `pip install -r [file]` without version conflicts (Windows-only pkgs fail on Linux — expected)
-- [] Git shows changed files (not new files) — N/A for rewrite sprint; cyrus2/ files are new, not modifications
+- [x] `cyrus2/requirements.txt` exists with exact pinned versions (7 packages — see plan ambiguity resolution)
+- [x] `cyrus2/requirements-voice.txt` exists with exact pinned versions (10 packages)
+- [x] `cyrus2/requirements-brain.txt` exists with exact pinned versions (17 packages — superset)
+- [x] All versions obtained from latest stable PyPI (no working pip freeze env available; versions verified 2026-03-16)
+- [x] torch, faster-whisper, onnxruntime-gpu have confirmed compatible versions (CUDA 12.x + cuDNN 9 chain)
+- [x] Each file can be installed with `pip install -r [file]` without version conflicts (Windows-only pkgs fail on Linux — expected)
+- [x] Git shows changed files (not new files) — N/A for rewrite sprint; cyrus2/ files are new, not modifications
 
 ## Implementation Steps
 1. Identify a working Python environment with all current dependencies installed
