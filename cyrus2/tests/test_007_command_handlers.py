@@ -77,6 +77,17 @@ def _make_loop():
     return MagicMock(spec=asyncio.AbstractEventLoop)
 
 
+def _close_coro_side_effect(coro, loop):
+    """Side-effect for patched run_coroutine_threadsafe.
+
+    Closes any coroutine passed to the mock so the garbage collector does not
+    emit a ``RuntimeWarning: coroutine '…' was never awaited`` when it
+    destroys the orphaned coroutine object.
+    """
+    if asyncio.iscoroutine(coro):
+        coro.close()
+
+
 # ── AC: _COMMAND_HANDLERS dict structure ─────────────────────────────────────
 
 
@@ -102,11 +113,11 @@ class TestCommandHandlersDict(unittest.TestCase):
     def test_command_handlers_keys_match_expected_types(self):
         """AC: dispatch table keys must match all 6 command type strings."""
         expected = {
-            "switch_project",
+            "switch",
             "unlock",
             "which_project",
             "last_message",
-            "rename_session",
+            "rename",
             "pause",
         }
         actual = set(_COMMAND_HANDLERS.keys())
@@ -452,7 +463,7 @@ class TestHandleRenameSession(unittest.TestCase):
     """AC: rename_session handler preserves original behavior."""
 
     def test_rename_session_success_calls_rename_alias(self):
-        """rename_session success: calls session_mgr.rename_alias."""
+        """rename success: calls session_mgr.rename_alias."""
         session_mgr = _make_session_mgr(
             aliases={"web": "web-proj"},
             last_resp=None,
@@ -460,7 +471,7 @@ class TestHandleRenameSession(unittest.TestCase):
 
         with patch("cyrus_brain._resolve_project", return_value="web-proj"):
             result = _handle_rename_session(
-                cmd={"new": "frontend", "old": "web"},
+                cmd={"name": "frontend", "old": "web"},
                 spoken="",
                 session_mgr=session_mgr,
                 loop=_make_loop(),
@@ -471,12 +482,12 @@ class TestHandleRenameSession(unittest.TestCase):
         self.assertIn("frontend", result.spoken)
 
     def test_rename_session_success_returns_confirmation_spoken(self):
-        """rename_session success: spoken text confirms new name."""
+        """rename success: spoken text confirms new name."""
         session_mgr = _make_session_mgr(aliases={"web": "web-proj"})
 
         with patch("cyrus_brain._resolve_project", return_value="web-proj"):
             result = _handle_rename_session(
-                cmd={"new": "frontend", "old": "web"},
+                cmd={"name": "frontend", "old": "web"},
                 spoken="",
                 session_mgr=session_mgr,
                 loop=_make_loop(),
@@ -486,12 +497,12 @@ class TestHandleRenameSession(unittest.TestCase):
         self.assertIn("frontend", result.spoken)
 
     def test_rename_session_no_project_returns_error(self):
-        """rename_session no matching project: returns error spoken, no rename."""
+        """rename no matching project: returns error spoken, no rename."""
         session_mgr = _make_session_mgr(aliases={})
 
         with patch("cyrus_brain._resolve_project", return_value=None):
             result = _handle_rename_session(
-                cmd={"new": "frontend", "old": "missing"},
+                cmd={"name": "frontend", "old": "missing"},
                 spoken="",
                 session_mgr=session_mgr,
                 loop=_make_loop(),
@@ -502,12 +513,12 @@ class TestHandleRenameSession(unittest.TestCase):
         self.assertIsNotNone(result.spoken)
 
     def test_rename_session_no_new_name_returns_error(self):
-        """rename_session empty new name: returns error spoken, no rename."""
+        """rename empty new name: returns error spoken, no rename."""
         session_mgr = _make_session_mgr(aliases={"web": "web-proj"})
 
         with patch("cyrus_brain._resolve_project", return_value="web-proj"):
             result = _handle_rename_session(
-                cmd={"new": "   ", "old": "web"},
+                cmd={"name": "   ", "old": "web"},
                 spoken="",
                 session_mgr=session_mgr,
                 loop=_make_loop(),
@@ -518,13 +529,13 @@ class TestHandleRenameSession(unittest.TestCase):
         self.assertIsNotNone(result.spoken)
 
     def test_rename_session_uses_active_project_when_no_old_hint(self):
-        """rename_session with no 'old' hint: falls back to active_project."""
+        """rename with no 'old' hint: falls back to active_project."""
         session_mgr = _make_session_mgr(aliases={"web": "web-proj"})
 
         with patch("cyrus_brain._resolve_project") as mock_resolve:
             # No old hint provided — should not call _resolve_project
             _handle_rename_session(
-                cmd={"new": "frontend", "old": ""},
+                cmd={"name": "frontend", "old": ""},
                 spoken="",
                 session_mgr=session_mgr,
                 loop=_make_loop(),
@@ -545,7 +556,10 @@ class TestHandlePause(unittest.TestCase):
     def test_pause_returns_skip_tts_true(self):
         """pause: skip_tts must be True (voice service handles the response)."""
         loop = _make_loop()
-        with patch("asyncio.run_coroutine_threadsafe"):
+        with patch(
+            "asyncio.run_coroutine_threadsafe",
+            side_effect=_close_coro_side_effect,
+        ):
             result = _handle_pause(
                 cmd={},
                 spoken="",
@@ -558,7 +572,10 @@ class TestHandlePause(unittest.TestCase):
     def test_pause_sends_pause_message(self):
         """pause: must call asyncio.run_coroutine_threadsafe with pause message."""
         loop = _make_loop()
-        with patch("asyncio.run_coroutine_threadsafe") as mock_rct:
+        with patch(
+            "asyncio.run_coroutine_threadsafe",
+            side_effect=_close_coro_side_effect,
+        ) as mock_rct:
             _handle_pause(
                 cmd={},
                 spoken="",
@@ -571,7 +588,10 @@ class TestHandlePause(unittest.TestCase):
     def test_pause_spoken_is_none(self):
         """pause: spoken must be None (nothing to say)."""
         loop = _make_loop()
-        with patch("asyncio.run_coroutine_threadsafe"):
+        with patch(
+            "asyncio.run_coroutine_threadsafe",
+            side_effect=_close_coro_side_effect,
+        ):
             result = _handle_pause(
                 cmd={},
                 spoken="",

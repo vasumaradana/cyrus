@@ -1,18 +1,18 @@
 ---
 id=023-Write-test-permission-keywords
 title=Issue 023: Write test_permission_keywords.py (Tier 3)
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053,054,055,056,057,058,059
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=121384
-total_output_tokens=31
-total_duration_seconds=632
-total_iterations=72
-run_count=72
+verify_count=1
+total_input_tokens=242183
+total_output_tokens=82
+total_duration_seconds=1032
+total_iterations=74
+run_count=73
 ---
 
 # Issue 023: Write test_permission_keywords.py (Tier 3)
@@ -802,5 +802,16 @@ pytest cyrus2/tests/test_permission_keywords.py -k "edge or ambiguous" -v
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 03:22:21Z
+
+- **From:** BUILT
+- **Duration in stage:** 400s
+- **Input tokens:** 120,799 (final context: 44,394)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 22%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

@@ -1,18 +1,18 @@
 ---
 id=011-Replace-prints-in-cyrus-voice
 title=Issue 011: Replace print() calls in cyrus_voice.py
-state=GROOMED
+state=BUILT
 parent=
-children=
+children=046,047
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=69464
-total_output_tokens=6
-total_duration_seconds=46
-total_iterations=1
-run_count=1
+verify_count=1
+total_input_tokens=293272
+total_output_tokens=67
+total_duration_seconds=1056
+total_iterations=4
+run_count=4
 ---
 
 # Issue 011: Replace print() calls in cyrus_voice.py
@@ -33,19 +33,19 @@ Replace all 32 `print()` calls in `cyrus2/cyrus_voice.py` with logging calls. Fo
 - Issue 009 — Create cyrus_log module
 
 ## Acceptance Criteria
-- [ ] All 32 `print()` calls replaced with `log.*()` equivalents
-- [ ] `from cyrus2.cyrus_log import setup_logging` added at module top
-- [ ] `import logging` added (if not present)
-- [ ] `log = logging.getLogger("cyrus.voice")` defined after imports
-- [ ] `setup_logging("cyrus")` called once in `main()` before any logging
-- [ ] `[Voice]` prefix patterns → `log.info()`
-- [ ] `[!]` prefix patterns → `log.error()`
-- [ ] Timeout/fallback patterns → `log.warning()`
-- [ ] Debug patterns (transcription flow, TTS dispatch) → `log.debug()`
-- [ ] Exception handlers using broad `except` → `log.error()` or `log.debug()` with `exc_info=True`
-- [ ] All f-strings converted to `%s` style logging
-- [ ] File still has same functionality; only logging mechanism changed
-- [ ] No new print() calls introduced
+- [x] All 32 `print()` calls replaced with `log.*()` equivalents
+- [x] `from cyrus2.cyrus_log import setup_logging` added at module top
+- [x] `import logging` added (if not present)
+- [x] `log = logging.getLogger("cyrus.voice")` defined after imports
+- [x] `setup_logging("cyrus")` called once in `main()` before any logging
+- [x] `[Voice]` prefix patterns → `log.info()`
+- [x] `[!]` prefix patterns → `log.error()`
+- [x] Timeout/fallback patterns → `log.warning()`
+- [x] Debug patterns (transcription flow, TTS dispatch) → `log.debug()`
+- [x] Exception handlers using broad `except` → `log.error()` or `log.debug()` with `exc_info=True`
+- [x] All f-strings converted to `%s` style logging
+- [x] File still has same functionality; only logging mechanism changed
+- [x] No new print() calls introduced
 
 ## Implementation Steps
 1. Add imports at top of `cyrus2/cyrus_voice.py`:
@@ -841,3 +841,36 @@ grep -n "print(" cyrus2/cyrus_voice.py
 - **Iterations:** 1
 - **Model:** claude-haiku-4-5-20251001
 - **Trigger:** auto/triage
+
+### PLANNED — 2026-03-17 00:45:15Z
+
+- **From:** PLANNED
+- **Duration in stage:** 287s
+- **Input tokens:** 68,952 (final context: 68,952)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 34%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### PLANNED — 2026-03-17 00:50:33Z
+
+- **From:** PLANNED
+- **Duration in stage:** 293s
+- **Input tokens:** 68,262 (final context: 68,262)
+- **Output tokens:** 10
+- **Iterations:** 1
+- **Context used:** 34%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### BUILT — 2026-03-17 01:06:44Z
+
+- **From:** BUILT
+- **Duration in stage:** 430s
+- **Input tokens:** 86,594 (final context: 86,594)
+- **Output tokens:** 26
+- **Iterations:** 1
+- **Context used:** 43%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** manual/build

@@ -1,18 +1,18 @@
 ---
 id=012-Replace-prints-in-cyrus-server
 title=Issue 012: Replace print() calls in cyrus_server.py
-state=GROOMED
+state=BUILT
 parent=
-children=
+children=046,047,048,049
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=49528
-total_output_tokens=5
-total_duration_seconds=31
-total_iterations=1
-run_count=1
+verify_count=1
+total_input_tokens=250949
+total_output_tokens=65
+total_duration_seconds=567
+total_iterations=4
+run_count=3
 ---
 
 # Issue 012: Replace print() calls in cyrus_server.py
@@ -811,3 +811,25 @@ grep -n "print(" cyrus2/cyrus_server.py
 - **Iterations:** 1
 - **Model:** claude-haiku-4-5-20251001
 - **Trigger:** auto/triage
+
+### PLANNED — 2026-03-17 00:43:33Z
+
+- **From:** PLANNED
+- **Duration in stage:** 184s
+- **Input tokens:** 76,411 (final context: 76,411)
+- **Output tokens:** 10
+- **Iterations:** 1
+- **Context used:** 38%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### BUILT — 2026-03-17 01:40:57Z
+
+- **From:** BUILT
+- **Duration in stage:** 352s
+- **Input tokens:** 125,010 (final context: 45,458)
+- **Output tokens:** 50
+- **Iterations:** 2
+- **Context used:** 23%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build

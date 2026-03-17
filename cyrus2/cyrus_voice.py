@@ -23,6 +23,7 @@ Protocol (line-delimited JSON):
 import argparse
 import asyncio
 import json
+import logging
 import os
 import re
 import threading
@@ -35,8 +36,11 @@ import numpy as np
 import pygame
 import sounddevice as sd
 import torch
+from cyrus2.cyrus_log import setup_logging
 from faster_whisper import WhisperModel
 from silero_vad import load_silero_vad
+
+log = logging.getLogger("cyrus.voice")
 
 # ── GPU detection ──────────────────────────────────────────────────────────────
 
@@ -128,7 +132,7 @@ def play_chime():
         wave = (np.sin(2 * np.pi * 880 * t) * 32767 * 0.25).astype(np.int16)
         pygame.sndarray.make_sound(np.column_stack([wave, wave])).play()
     except Exception:
-        pass
+        log.debug("Chime playback failed", exc_info=True)
 
 
 def play_listen_chime():
@@ -143,7 +147,7 @@ def play_listen_chime():
         wave = np.concatenate([tone(500, 0.09), gap, tone(800, 0.09)])
         pygame.sndarray.make_sound(np.column_stack([wave, wave])).play()
     except Exception:
-        pass
+        log.debug("Listen chime playback failed", exc_info=True)
 
 
 # ── Send to brain ──────────────────────────────────────────────────────────────
@@ -156,7 +160,7 @@ async def _send(msg: dict) -> None:
         _brain_writer.write((json.dumps(msg) + "\n").encode())
         await _brain_writer.drain()
     except Exception:
-        pass
+        log.debug("Failed to send to brain", exc_info=True)
 
 
 # ── TTS pipeline ───────────────────────────────────────────────────────────────
@@ -167,6 +171,7 @@ async def drain_tts_queue() -> None:
         try:
             _tts_queue.get_nowait()
         except Exception:
+            log.debug("Error draining TTS queue", exc_info=True)
             break
 
 
@@ -178,7 +183,7 @@ async def speak(text: str) -> None:
     try:
         await asyncio.wait_for(_speak_save(text), timeout=25.0)
     except asyncio.TimeoutError:
-        print("[Voice] TTS timed out")
+        log.warning("TTS timed out")
         _stop_speech.set()
     finally:
         _tts_active.clear()
@@ -195,12 +200,12 @@ async def _speak_save(text: str) -> None:
 
 
 async def _speak_kokoro(text: str) -> None:
-    print(f"[TTS] generating {len(text)} chars...")
+    log.debug("TTS generating %s chars...", len(text))
     samples, sr = await asyncio.get_event_loop().run_in_executor(
         None,
         lambda: _kokoro.create(text, voice=TTS_VOICE, speed=TTS_SPEED, lang="en-us"),
     )
-    print(f"[TTS] {len(samples)} samples at {sr}Hz — playing")
+    log.debug("TTS %s samples at %sHz — playing", len(samples), sr)
 
     def _play():
         chunk = 1024
@@ -267,7 +272,7 @@ async def _speak_edge(text: str) -> None:
         try:
             os.unlink(tmp_path)
         except Exception:
-            pass
+            log.debug("Failed to delete temp file", exc_info=True)
 
 
 async def tts_worker() -> None:
@@ -276,11 +281,11 @@ async def tts_worker() -> None:
         project, text = await _tts_queue.get()
         _tts_pending.clear()
         try:
-            print(f"[TTS worker] speak: {text[:50]!r}")
+            log.debug("TTS worker speak: %r", text[:50])
             await speak(text)
-            print("[TTS worker] done")
+            log.debug("TTS worker done")
         except Exception as e:
-            print(f"[TTS worker error] {e}")
+            log.error("TTS worker error: %s", e)
 
 
 # ── STT ────────────────────────────────────────────────────────────────────────
@@ -299,7 +304,7 @@ def transcribe(whisper_model: WhisperModel, audio: np.ndarray) -> str:
     )
     text = " ".join(s.text for s in segments if s.no_speech_prob < 0.6).strip()
     if _HALLUCINATIONS.search(text):
-        print(f"(hallucination filtered: '{text[:60]}')")
+        log.debug("Hallucination filtered: %s", text[:60])
         return ""
     return text
 
@@ -340,6 +345,7 @@ def vad_loop(on_utterance, loop: asyncio.AbstractEventLoop):
                     prob = model(torch.from_numpy(chunk), SAMPLE_RATE).item()
                 is_speech = prob > SPEECH_THRESHOLD
             except Exception:
+                log.debug("VAD frame error", exc_info=True)
                 continue
 
             if not recording:
@@ -354,7 +360,7 @@ def vad_loop(on_utterance, loop: asyncio.AbstractEventLoop):
                     silence_count = 0
                     speech_frames = 0
                     ring.clear()
-                    print("Listening...", flush=True)
+                    log.debug("Listening...")
             else:
                 frames.append(frame_bytes)
                 if is_speech:
@@ -371,7 +377,7 @@ def vad_loop(on_utterance, loop: asyncio.AbstractEventLoop):
                 timed_out = len(frames) >= MAX_RECORD_FRAMES
                 if silence_count >= adaptive_ring or timed_out:
                     if timed_out:
-                        print(" [max duration]", flush=True)
+                        log.debug("Max duration reached")
                     raw_audio = b"".join(frames)
                     audio = (
                         np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32)
@@ -420,21 +426,21 @@ async def brain_reader(reader: asyncio.StreamReader) -> None:
             elif mtype == "pause":
                 if _user_paused.is_set():
                     _user_paused.clear()
-                    print("[Voice] Resumed")
+                    log.info("Resumed")
                 else:
                     _user_paused.set()
-                    print("[Voice] Paused")
+                    log.info("Paused")
 
             elif mtype == "whisper_prompt":
                 _whisper_prompt = msg.get("text", _whisper_prompt)
 
             elif mtype == "status":
-                print(msg.get("msg", ""))
+                log.info("%s", msg.get("msg", ""))
 
         except json.JSONDecodeError:
-            pass
+            log.debug("Invalid JSON from brain", exc_info=True)
         except Exception as e:
-            print(f"[Voice] Brain reader error: {e}")
+            log.error("Brain reader error: %s", e)
             break
 
 
@@ -462,12 +468,12 @@ async def voice_loop(whisper_model, reader, writer, loop) -> None:
         try:
             utterance_queue.get_nowait()
         except Exception:
-            pass
+            log.debug("Queue drain error", exc_info=True)
 
     asyncio.create_task(_reader_task())
     asyncio.create_task(tts_worker())
 
-    print("[Voice] Ready — streaming utterances to brain.")
+    log.info("Ready — streaming utterances to brain.")
 
     while not disconnected.is_set():
         try:
@@ -481,19 +487,19 @@ async def voice_loop(whisper_model, reader, writer, loop) -> None:
             except asyncio.QueueEmpty:
                 break
 
-        print("Transcribing...", end=" ", flush=True)
+        log.debug("Transcribing...")
         text = await loop.run_in_executor(
             _whisper_executor, transcribe, whisper_model, audio
         )
         if not text:
-            print("(nothing heard)")
+            log.debug("Nothing heard")
             continue
 
         during_tts = _tts_active.is_set() or _tts_pending.is_set()
-        print(f"'{text}'" if not during_tts else f"[during TTS] '{text}'")
+        log.debug("Transcribed%s: %s", " (during TTS)" if during_tts else "", text)
         await _send({"type": "utterance", "text": text, "during_tts": during_tts})
 
-    print("[Voice] Brain disconnected — reconnecting...")
+    log.warning("Brain disconnected — reconnecting...")
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -502,16 +508,18 @@ async def voice_loop(whisper_model, reader, writer, loop) -> None:
 async def main() -> None:
     global _tts_queue, _whisper_executor, _kokoro
 
+    setup_logging("cyrus")
+
     parser = argparse.ArgumentParser(description="Cyrus Voice — audio I/O service")
     parser.add_argument("--host", default=BRAIN_HOST, help="Brain host")
     parser.add_argument("--port", type=int, default=BRAIN_PORT, help="Brain port")
     args = parser.parse_args()
 
     if _CUDA:
-        print(f"[Voice] GPU: {_GPU_NAME}")
+        log.info("GPU: %s", _GPU_NAME)
     else:
-        print("[Voice] No CUDA GPU — Whisper on CPU")
-    print(f"Loading Whisper {WHISPER_MODEL} on {WHISPER_DEVICE}...")
+        log.info("No CUDA GPU — Whisper on CPU")
+    log.info("Loading Whisper %s on %s...", WHISPER_MODEL, WHISPER_DEVICE)
     whisper_model = WhisperModel(
         WHISPER_MODEL, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE_TYPE
     )
@@ -533,11 +541,11 @@ async def main() -> None:
             _tts_dev = (
                 "GPU" if "CUDAExecutionProvider" in _session.get_providers() else "CPU"
             )
-            print(f"[Voice] Kokoro TTS loaded ({_tts_dev}) — voice: {TTS_VOICE}")
+            log.info("Kokoro TTS loaded (%s) — voice: %s", _tts_dev, TTS_VOICE)
         except Exception as e:
-            print(f"[Voice] Kokoro load failed ({e}) — using Edge TTS")
+            log.warning("Kokoro load failed (%s) — using Edge TTS", e)
     else:
-        print("[Voice] Kokoro model not found — using Edge TTS")
+        log.warning("Kokoro model not found — using Edge TTS")
 
     pygame.mixer.init()
     _whisper_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="whisper")
@@ -548,10 +556,10 @@ async def main() -> None:
     def _toggle_pause():
         if _user_paused.is_set():
             _user_paused.clear()
-            print("[Voice] Resumed (F9)")
+            log.info("Resumed (F9)")
         else:
             _user_paused.set()
-            print("[Voice] Paused (F9)")
+            log.info("Paused (F9)")
 
     def _stop_and_clear():
         _stop_speech.set()
@@ -566,23 +574,23 @@ async def main() -> None:
                 _tts_pending.set()
                 asyncio.run_coroutine_threadsafe(_tts_queue.put(("", text)), loop)
         except Exception:
-            pass
+            log.debug("Clipboard read failed", exc_info=True)
 
     keyboard.add_hotkey(KEY_PAUSE, _toggle_pause)
     keyboard.add_hotkey(KEY_STOP, _stop_and_clear)
     keyboard.add_hotkey(KEY_READ_CLIP, _read_clipboard)
-    print("[Voice] F9 pause  |  F7 stop+clear  |  F8 clipboard  |  Ctrl+C exit")
+    log.info("F9 pause | F7 stop+clear | F8 clipboard | Ctrl+C exit")
 
     # ── Connect loop — reconnects automatically if brain restarts ─────────────
-    print(f"[Voice] Connecting to brain at {args.host}:{args.port}...")
+    log.info("Connecting to brain at %s:%s...", args.host, args.port)
     while not _shutdown.is_set():
         try:
             reader, writer = await asyncio.open_connection(args.host, args.port)
-            print("[Voice] Connected to brain.")
+            log.info("Connected to brain.")
             try:
                 await voice_loop(whisper_model, reader, writer, loop)
             except Exception as e:
-                print(f"[Voice] Disconnected: {e}")
+                log.warning("Disconnected: %s", e)
             finally:
                 global _brain_writer
                 _brain_writer = None
@@ -590,9 +598,9 @@ async def main() -> None:
                     writer.close()
                     await writer.wait_closed()
                 except Exception:
-                    pass
+                    log.debug("Writer close error", exc_info=True)
         except Exception as e:
-            print(f"[Voice] Cannot connect to brain ({e}) — retrying in 3s...")
+            log.warning("Cannot connect to brain (%s) — retrying in 3s...", e)
         await asyncio.sleep(3)
 
 
@@ -602,7 +610,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
-        print("\nCyrus Voice signing off.")
+        log.info("Cyrus Voice signing off.")
         _shutdown.set()
         _stop_speech.set()
         _mic_muted.set()
@@ -610,15 +618,15 @@ if __name__ == "__main__":
             pygame.mixer.stop()
             pygame.mixer.quit()
         except Exception:
-            pass
+            log.debug("Pygame cleanup error", exc_info=True)
         try:
             sd.stop()
         except Exception:
-            pass
+            log.debug("Sound device cleanup error", exc_info=True)
         if _whisper_executor:
             _whisper_executor.shutdown(wait=False, cancel_futures=True)
         try:
             keyboard.unhook_all()
         except Exception:
-            pass
+            log.debug("Keyboard cleanup error", exc_info=True)
         os._exit(0)

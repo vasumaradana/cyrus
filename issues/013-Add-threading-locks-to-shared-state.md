@@ -1,18 +1,18 @@
 ---
 id=013-Add-threading-locks-to-shared-state
 title=Issue 013: Add threading locks to shared state
-state=GROOMED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=84143
-total_output_tokens=6
-total_duration_seconds=106
-total_iterations=2
-run_count=2
+verify_count=1
+total_input_tokens=394174
+total_output_tokens=84
+total_duration_seconds=1118
+total_iterations=5
+run_count=4
 ---
 
 # Issue 013: Add threading locks to shared state
@@ -827,6 +827,28 @@ python -c "from cyrus2.cyrus_brain import _conversation_active; _conversation_ac
 - **Iterations:** 1
 - **Model:** claude-haiku-4-5-20251001
 - **Trigger:** interview
+
+### PLANNED — 2026-03-17 00:49:03Z
+
+- **From:** PLANNED
+- **Duration in stage:** 263s
+- **Input tokens:** 108,856 (final context: 108,856)
+- **Output tokens:** 26
+- **Iterations:** 1
+- **Context used:** 54%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### BUILT — 2026-03-17 01:53:27Z
+
+- **From:** BUILT
+- **Duration in stage:** 749s
+- **Input tokens:** 201,175 (final context: 54,083)
+- **Output tokens:** 52
+- **Iterations:** 2
+- **Context used:** 27%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
 ## Interview Questions
 
 1. The issue specifies adding locks 'at top of cyrus2/cyrus_brain.py', but `_chat_input_cache` and `_chat_input_coords` are defined in cyrus_common.py. After issue 005 (Extract shared code), these variables were moved from cyrus_brain.py to cyrus_common.py. Should locks be defined in both files where variables are defined, or centralized in cyrus_brain.py? Also, should `_chat_input_cache` be protected if it's not imported into cyrus_brain.py?

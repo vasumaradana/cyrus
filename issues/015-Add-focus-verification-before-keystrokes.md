@@ -1,18 +1,18 @@
 ---
 id=015-Add-focus-verification-before-keystrokes
 title=Issue 015: Add focus verification before keystrokes
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=227902
-total_output_tokens=85
-total_duration_seconds=1123
-total_iterations=72
-run_count=72
+verify_count=1
+total_input_tokens=443901
+total_output_tokens=161
+total_duration_seconds=2419
+total_iterations=75
+run_count=74
 ---
 
 # Issue 015: Add focus verification before keystrokes
@@ -808,3 +808,25 @@ CYRUS_LOG_LEVEL=DEBUG python cyrus2/cyrus_brain.py 2>&1 | grep "Focus mismatch"
 - **Context used:** 30%
 - **Model:** claude-opus-4-6
 - **Trigger:** manual/plan
+
+### PLANNED — 2026-03-17 00:42:28Z
+
+- **From:** PLANNED
+- **Duration in stage:** 220s
+- **Input tokens:** 52,864 (final context: 52,864)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 26%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### BUILT — 2026-03-17 02:11:24Z
+
+- **From:** BUILT
+- **Duration in stage:** 1076s
+- **Input tokens:** 163,135 (final context: 38,399)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 19%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build

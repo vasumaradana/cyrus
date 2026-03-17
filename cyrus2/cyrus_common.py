@@ -12,6 +12,7 @@ patterns (TTS queue + local audio vs. websocket IPC).
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import threading
 import time
@@ -50,6 +51,13 @@ except Exception:
     except Exception:
         auto = None  # type: ignore[assignment]
         _HAS_UIA = False
+
+# ── Module logger ──────────────────────────────────────────────────────────────
+log = logging.getLogger("cyrus.common")
+
+# Dedicated security audit logger for permission events — use this logger (not
+# 'log') so callers can filter permission events with `grep "cyrus.permission"`.
+_perm_log = logging.getLogger("cyrus.permission")
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -120,9 +128,15 @@ _ANSWER_RE = re.compile(
 
 # project_name → UIA EditControl (for same-thread reuse)
 _chat_input_cache: dict = {}
+# Protects all reads/writes to _chat_input_cache across ChatWatcher and
+# PermissionWatcher background threads.
+_chat_input_cache_lock: threading.Lock = threading.Lock()
 
 # proj → (cx, cy) pixel coords (cross-thread safe — plain ints, no COM objects)
 _chat_input_coords: dict = {}
+# Protects all reads/writes to _chat_input_coords across ChatWatcher,
+# PermissionWatcher, and the submit thread in cyrus_brain.py.
+_chat_input_coords_lock: threading.Lock = threading.Lock()
 
 # ── Chime registration ─────────────────────────────────────────────────────────
 
@@ -280,48 +294,62 @@ def _is_answer_request(text: str) -> bool:
 def _fast_command(text: str) -> dict | None:
     """Regex fast-path for obvious Cyrus meta-commands.
 
-    Returns a routing decision dict or None if the utterance should be
-    forwarded to the LLM.
+    Returns a flat command dict or None if the utterance should be forwarded to
+    the LLM. Each command dict contains at minimum a ``'command'`` key with the
+    command type string. Optional keys carry parsed parameters.
+
+    Command types and their optional parameters:
+
+    - ``pause``        — optional ``duration`` (int, seconds)
+    - ``unlock``       — optional ``password`` (str)
+    - ``which_project``— no parameters
+    - ``last_message`` — no parameters
+    - ``switch``       — required ``project`` (str)
+    - ``rename``       — required ``name`` (str, new name); optional ``old`` (str, hint)
+
+    Examples::
+
+        >>> _fast_command("pause")
+        {'command': 'pause'}
+        >>> _fast_command("pause for 10 seconds")
+        {'command': 'pause', 'duration': 10}
+        >>> _fast_command("unlock mypassword")
+        {'command': 'unlock', 'password': 'mypassword'}
+        >>> _fast_command("switch to myproject")
+        {'command': 'switch', 'project': 'myproject'}
+        >>> _fast_command("hello cyrus")
+
     """
     t = text.lower().strip().rstrip(".,!?")
 
-    # pause / resume
+    # ── pause / resume ────────────────────────────────────────────────────────
+    # Check duration variant before bare pause so "pause for 5 seconds" is
+    # captured with its parameter rather than matching the fullmatch below.
+    m = re.match(r"pause\s+for\s+(\d+)\s+seconds?", t)
+    if m:
+        return {"command": "pause", "duration": int(m.group(1))}
+
     if re.fullmatch(r"pause|resume|stop listening|start listening", t):
-        return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {"type": "pause"},
-        }
+        return {"command": "pause"}
 
-    # unlock / auto
+    # ── unlock / auto ─────────────────────────────────────────────────────────
+    # Password variant checked first so "unlock secret" captures the password.
+    m = re.match(r"un ?lock\s+(.+)", t)
+    if m:
+        return {"command": "unlock", "password": m.group(1).strip()}
+
     if re.fullmatch(r"(un ?lock|auto|follow focus|auto(matic)? routing)", t):
-        return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {"type": "unlock"},
-        }
+        return {"command": "unlock"}
 
-    # which project / what project
+    # ── which project / what project ──────────────────────────────────────────
     if re.search(r"\b(which|what)\b.{0,20}\b(project|session)\b", t):
-        return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {"type": "which_project"},
-        }
+        return {"command": "which_project"}
 
-    # last message / replay
+    # ── last message / replay ─────────────────────────────────────────────────
     if re.fullmatch(r"(last|repeat|replay|again).{0,30}(message|response|said)?", t):
-        return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {"type": "last_message"},
-        }
+        return {"command": "last_message"}
 
-    # switch to <name>  — many natural phrasings
+    # ── switch to <name> — many natural phrasings ─────────────────────────────
     m = (
         re.match(r"(?:switch(?:ed)?(?: to)?|use|go to|open|activate)\s+(.+)", t)
         or re.match(r"make\s+(.+?)\s+(?:the\s+)?active", t)
@@ -330,40 +358,64 @@ def _fast_command(text: str) -> dict | None:
         )
     )
     if m:
-        return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {"type": "switch_project", "project": m.group(1).strip()},
-        }
+        return {"command": "switch", "project": m.group(1).strip()}
 
-    # rename this to <new>  /  call this <new>
+    # ── rename / relabel ──────────────────────────────────────────────────────
+    # "rename [this] [session|window] to <new>" / "call this [session|window] <new>"
+    # — checked before the two-arg form to avoid "this" being treated as old name.
     m = re.match(
         r"(?:rename|relabel)\s+(?:this\s+)?(?:session\s+|window\s+)?to\s+(.+)", t
     ) or re.match(r"call\s+this\s+(?:session\s+|window\s+)?(.+)", t)
     if m:
-        return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {"type": "rename_session", "new": m.group(1).strip()},
-        }
+        return {"command": "rename", "name": m.group(1).strip()}
 
-    # rename <old> to <new>
+    # "rename project/session <new>" — shorthand for rename current session
+    m = re.match(r"(?:rename|relabel)\s+(?:project|session)\s+(.+)", t)
+    if m:
+        return {"command": "rename", "name": m.group(1).strip()}
+
+    # "rename <old> to <new>" — rename specific session by hint
     m = re.match(r"(?:rename|relabel)\s+(.+?)\s+to\s+(.+)", t)
     if m:
         return {
-            "action": "command",
-            "spoken": "",
-            "message": "",
-            "command": {
-                "type": "rename_session",
-                "old": m.group(1).strip(),
-                "new": m.group(2).strip(),
-            },
+            "command": "rename",
+            "name": m.group(2).strip(),
+            "old": m.group(1).strip(),
         }
 
     return None
+
+
+# ── Focus verification guard ───────────────────────────────────────────────────
+
+
+def _assert_vscode_focus() -> None:
+    """Verify VS Code has window focus; raise RuntimeError if it does not.
+
+    Uses UIAutomation to walk up from the currently focused control to the
+    top-level window and checks that its Name contains "Visual Studio Code".
+    Called immediately before every pyautogui keystroke sequence to prevent
+    misdirected input if focus changes mid-operation.
+
+    Raises:
+        RuntimeError: If the focused window is not VS Code, or if UIAutomation
+            raises an exception while querying the focused control.
+    """
+    try:
+        ctrl = auto.GetFocusedControl()
+        # Walk up the UIA tree to find the top-level window name
+        window_name: str = ctrl.Name if ctrl is not None else ""
+        parent = ctrl.GetParentControl() if ctrl is not None else None
+        while parent is not None:
+            window_name = parent.Name
+            parent = parent.GetParentControl()
+    except Exception as exc:
+        log.warning("Could not verify VS Code focus via UIAutomation: %s", exc)
+        raise RuntimeError(f"Focus verification failed: {exc}") from exc
+
+    if "Visual Studio Code" not in window_name:
+        log.error("Focus mismatch: %s (not VS Code)", window_name)
+        raise RuntimeError(f"VS Code not focused, got {window_name!r}")
 
 
 # ── Chat Watcher ───────────────────────────────────────────────────────────────
@@ -585,8 +637,11 @@ class ChatWatcher:
             label = f"[{self.project_name}] " if self.project_name else ""
             print(f"[Cyrus] {label}Connected to Claude Code chat panel.")
 
-            # Populate chat input coords early — direct EditControl search
-            if self.project_name not in _chat_input_coords and _HAS_UIA:
+            # Populate chat input coords early — direct EditControl search.
+            # Check under lock; do UIA work outside lock (no blocking inside lock).
+            with _chat_input_coords_lock:
+                needs_coords = self.project_name not in _chat_input_coords
+            if needs_coords and _HAS_UIA:
                 try:
                     vscode = auto.WindowControl(searchDepth=1, SubName=self._target_sub)
                     if vscode.Exists(1):
@@ -594,13 +649,15 @@ class ChatWatcher:
                         if ctrl.Exists(2):
                             r = ctrl.BoundingRectangle
                             if r.width() > 0:
-                                _chat_input_coords[self.project_name] = (
+                                coords_val = (
                                     (r.left + r.right) // 2,
                                     (r.top + r.bottom) // 2,
                                 )
+                                with _chat_input_coords_lock:
+                                    _chat_input_coords[self.project_name] = coords_val
                                 print(
                                     f"[Cyrus] {label}Chat input coords cached: "
-                                    f"{_chat_input_coords.get(self.project_name)}"
+                                    f"{coords_val}"
                                 )
                 except Exception as e:
                     print(f"[Cyrus] {label}Coords cache error: {e}")
@@ -879,18 +936,23 @@ class PermissionWatcher:
 
         walk(self._chat_doc)
 
-        # Cache chat input pixel coords (plain ints — no COM cross-thread issues)
-        if self.project_name not in _chat_input_coords:
+        # Cache chat input pixel coords (plain ints — no COM cross-thread issues).
+        # Check under lock; UIA work is done outside lock (no blocking inside lock).
+        with _chat_input_coords_lock:
+            needs_coords = self.project_name not in _chat_input_coords
+        if needs_coords:
             for _, ctype, name, ctrl in items:
                 if ctype == "EditControl" and name == _CHAT_INPUT_HINT:
-                    _chat_input_cache[self.project_name] = ctrl
+                    with _chat_input_cache_lock:
+                        _chat_input_cache[self.project_name] = ctrl
                     try:
                         r = ctrl.BoundingRectangle
                         if r.width() > 0 and r.height() > 0:
-                            _chat_input_coords[self.project_name] = (
-                                (r.left + r.right) // 2,
-                                (r.top + r.bottom) // 2,
-                            )
+                            with _chat_input_coords_lock:
+                                _chat_input_coords[self.project_name] = (
+                                    (r.left + r.right) // 2,
+                                    (r.top + r.bottom) // 2,
+                                )
                     except Exception:
                         pass
                     break
@@ -972,6 +1034,13 @@ class PermissionWatcher:
         cmd_short = cmd[:120] if cmd else tool
         prompt = f"{prefix}Allow {tool}: {cmd_short}. Say yes or no."
         print(f"\n[Permission/hook] {prefix}{tool}: {cmd}")
+        # Security audit: record every permission request for the audit trail.
+        _perm_log.info(
+            "Permission requested: tool=%s cmd=%s project=%s",
+            tool,
+            cmd[:120],
+            self.project_name,
+        )
         self._stop_speech_fn()
         self._speak_urgent_fn(prompt)
 
@@ -982,9 +1051,25 @@ class PermissionWatcher:
         """
         if not self._pending or not self._allow_btn:
             return False
+        # Guard: verify VS Code has focus before sending any keystrokes.
+        # Abort and clear pending state if focus has drifted to another window.
+        try:
+            _assert_vscode_focus()
+        except RuntimeError as _focus_err:
+            print(f"[Cyrus] Focus check failed, aborting response: {_focus_err}")
+            self._pending = False
+            self._allow_btn = None
+            return True
         words = set(text.lower().strip().split())
         if words & self.ALLOW_WORDS:
             print(f"[Cyrus] → Allowing command ({self.project_name or 'session'})")
+            # Security audit: record the approved permission with its utterance.
+            _perm_log.info(
+                "Permission APPROVED: cmd=%s utterance=%r project=%s",
+                self._announced,
+                text.strip(),
+                self.project_name,
+            )
             if self._allow_btn == "keyboard":
                 # Native VS Code Quick Pick: press "1" to select "1 Yes"
                 vscode = auto.WindowControl(searchDepth=1, SubName=self._target_sub)
@@ -1008,6 +1093,13 @@ class PermissionWatcher:
             return True
         if words & self.DENY_WORDS:
             print(f"[Cyrus] → Cancelling command ({self.project_name or 'session'})")
+            # Security audit: record the denied permission with its utterance.
+            _perm_log.info(
+                "Permission DENIED: cmd=%s utterance=%r project=%s",
+                self._announced,
+                text.strip(),
+                self.project_name,
+            )
             vscode = auto.WindowControl(searchDepth=1, SubName=self._target_sub)
             if vscode.Exists(1):
                 try:
@@ -1027,6 +1119,15 @@ class PermissionWatcher:
         """
         if not self._prompt_pending or not self._prompt_input_ctrl:
             return False
+        # Guard: verify VS Code has focus before sending any keystrokes.
+        # Abort and clear prompt state if focus has drifted to another window.
+        try:
+            _assert_vscode_focus()
+        except RuntimeError as _focus_err:
+            print(f"[Cyrus] Focus check failed, aborting prompt response: {_focus_err}")
+            self._prompt_pending = False
+            self._prompt_input_ctrl = None
+            return True
         cancel = {
             "cancel",
             "escape",
@@ -1120,6 +1221,12 @@ class PermissionWatcher:
                             print(
                                 "\n[Permission] "
                                 f"{prefix}Claude wants to run: {cmd_label}"
+                            )
+                            # Security audit: record every UIA-detected dialog.
+                            _perm_log.info(
+                                "Permission dialog detected: cmd=%s project=%s",
+                                cmd_label,
+                                self.project_name,
                             )
                             self._stop_speech_fn()
                             self._speak_urgent_fn(prompt)

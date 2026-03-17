@@ -1,18 +1,18 @@
 ---
 id=024-Write-test-vad-logic
 title=Issue 024: Write test_vad_logic.py (Tier 3)
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053,054,055,056,057,058,059,060
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=131025
-total_output_tokens=24
-total_duration_seconds=604
-total_iterations=70
-run_count=70
+verify_count=1
+total_input_tokens=313452
+total_output_tokens=75
+total_duration_seconds=1586
+total_iterations=72
+run_count=71
 ---
 
 # Issue 024: Write test_vad_logic.py (Tier 3)
@@ -807,5 +807,16 @@ pytest cyrus2/tests/test_vad_logic.py -k "timeout" -v
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 03:38:44Z
+
+- **From:** BUILT
+- **Duration in stage:** 982s
+- **Input tokens:** 182,427 (final context: 68,211)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 34%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

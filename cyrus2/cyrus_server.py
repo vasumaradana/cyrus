@@ -32,12 +32,17 @@ Server → Client  (decision):
 import argparse
 import asyncio
 import json
+import logging
 import re
 
 try:
     import websockets
 except ImportError:
     raise SystemExit("websockets not installed — run: pip install websockets") from None
+
+from cyrus2.cyrus_log import setup_logging
+
+log = logging.getLogger("cyrus.server")
 
 
 # ── Config (mirrors main.py) ───────────────────────────────────────────────────
@@ -124,7 +129,7 @@ def _fast_command(text: str) -> dict | None:
 
 async def handle_client(websocket):
     addr = websocket.remote_address
-    print(f"[Brain] Client connected: {addr}")
+    log.info("Client connected: %s", addr)
 
     try:
         async for raw in websocket:
@@ -171,24 +176,25 @@ async def handle_client(websocket):
             reply = {"type": "decision", **decision}
             await websocket.send(json.dumps(reply))
 
-            print(f"[Brain] [{project or '?'}] '{text[:50]}' → {decision['action']}")
+            log.debug("[%s] '%s' -> %s", project or "?", text[:50], decision["action"])
 
     except websockets.ConnectionClosed:
         pass
     finally:
-        print(f"[Brain] Client disconnected: {addr}")
+        log.info("Client disconnected: %s", addr)
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 
 async def _serve(host: str, port: int) -> None:
-    print(f"[Brain] Listening on ws://{host}:{port}")
+    log.info("Listening on ws://%s:%s", host, port)
     async with websockets.serve(handle_client, host, port):
         await asyncio.Future()  # run forever
 
 
 def main() -> None:
+    setup_logging("cyrus")
     parser = argparse.ArgumentParser(
         description="Cyrus Remote Brain (WebSocket server)"
     )

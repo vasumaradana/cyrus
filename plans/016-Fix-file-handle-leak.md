@@ -2,7 +2,7 @@
 
 **Issue**: [016-Fix-file-handle-leak](/home/daniel/Projects/barf/cyrus/issues/016-Fix-file-handle-leak.md)
 **Created**: 2026-03-16
-**Updated**: 2026-03-16 (line numbers corrected after gap analysis — file was refactored since audit)
+**Updated**: 2026-03-17 (implemented — all 344 tests pass)
 **PROMPT**: prompts/PROMPT_plan.md
 
 ## Gap Analysis
@@ -51,10 +51,10 @@
 
 ## Prioritized Tasks
 
-- [ ] Fix `cyrus_brain.py:568` — wrap `open()` in `with` statement, add `FileNotFoundError` and `ValueError` handling with `print()` diagnostics, re-raise exceptions
-- [ ] Write acceptance-driven tests in `cyrus2/tests/test_016_file_handle_leak.py` using `unittest.TestCase` + `unittest.mock` to verify all 6 acceptance criteria
-- [ ] Run tests (`python -m pytest cyrus2/tests/test_016_file_handle_leak.py -v`) and verify they pass
-- [ ] Run full test suite (`python -m pytest cyrus2/tests/ -v`) and verify no regressions
+- [x] Fix `cyrus_brain.py:595` — wrap `open()` in `with` statement, add `FileNotFoundError` and `ValueError` handling with `log.error()` diagnostics, re-raise exceptions
+- [x] Write acceptance-driven tests in `cyrus2/tests/test_016_file_handle_leak.py` using `unittest.TestCase` + `unittest.mock` to verify all 6 acceptance criteria
+- [x] Run tests (`cyrus2/.venv/bin/pytest cyrus2/tests/test_016_file_handle_leak.py -v`) and verify they pass — **20/20 passed**
+- [x] Run full test suite (`cyrus2/.venv/bin/pytest cyrus2/tests/ -v`) and verify no regressions — **344/344 passed**
 
 ## Code Change Detail
 
@@ -69,12 +69,14 @@ try:
     with open(port_file) as f:
         port = int(f.read().strip())
 except FileNotFoundError:
-    print(f"[Brain] Port file not found: {port_file}")
+    log.error("Port file not found: %s", port_file, exc_info=True)
     raise
 except ValueError:
-    print(f"[Brain] Invalid port number in {port_file}")
+    log.error("Invalid port number in %s", port_file, exc_info=True)
     raise
 ```
+
+**Note**: Plan originally specified `print()` diagnostics but `test_010` enforces all print() replaced with log.*(). Updated to `log.error()` with `exc_info=True` and `%s` formatting to match existing conventions and pass test_010.
 
 ### Full function context after fix (lines 560-580):
 ```python

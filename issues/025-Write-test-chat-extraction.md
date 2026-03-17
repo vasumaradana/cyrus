@@ -1,18 +1,18 @@
 ---
 id=025-Write-test-chat-extraction
 title=Issue 025: Write test_chat_extraction.py (Tier 4)
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053,054,055,056,057,058,059,060,061
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=109760
-total_output_tokens=29
-total_duration_seconds=494
-total_iterations=69
-run_count=69
+verify_count=1
+total_input_tokens=246580
+total_output_tokens=80
+total_duration_seconds=958
+total_iterations=71
+run_count=70
 ---
 
 # Issue 025: Write test_chat_extraction.py (Tier 4)
@@ -786,5 +786,16 @@ pytest cyrus2/tests/test_chat_extraction.py -k "missing or error" -v
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 03:46:29Z
+
+- **From:** BUILT
+- **Duration in stage:** 464s
+- **Input tokens:** 136,820 (final context: 49,393)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 25%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

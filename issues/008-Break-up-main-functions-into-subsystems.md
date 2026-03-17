@@ -1,18 +1,18 @@
 ---
 id=008-Break-up-main-functions-into-subsystems
 title=Issue 008: Break up main() functions into subsystems
-state=PLANNED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=232618
-total_output_tokens=56
-total_duration_seconds=777
-total_iterations=68
-run_count=68
+total_input_tokens=307993
+total_output_tokens=83
+total_duration_seconds=861
+total_iterations=70
+run_count=69
 ---
 
 # Issue 008: Break up main() functions into subsystems
@@ -867,3 +867,24 @@ None (but benefits from Issue 005 extraction)
 - **Context used:** 29%
 - **Model:** claude-opus-4-6
 - **Trigger:** manual/plan
+
+### COMPLETE — 2026-03-17 00:47:32Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-17 00:47:32Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 84s
+- **Input tokens:** 75,375 (final context: 36,956)
+- **Output tokens:** 27
+- **Iterations:** 2
+- **Context used:** 18%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** manual/build

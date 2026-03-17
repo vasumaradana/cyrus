@@ -1,18 +1,18 @@
 ---
 id=020-Write-test-project-matching
 title=Issue 020: Write test_project_matching.py (Tier 1)
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053,054,055,056
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=170150
-total_output_tokens=51
-total_duration_seconds=693
-total_iterations=71
-run_count=71
+verify_count=1
+total_input_tokens=317500
+total_output_tokens=102
+total_duration_seconds=960
+total_iterations=73
+run_count=72
 ---
 
 # Issue 020: Write test_project_matching.py (Tier 1)
@@ -794,5 +794,16 @@ pytest cyrus2/tests/test_project_matching.py -k "alias" -v
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 02:49:38Z
+
+- **From:** BUILT
+- **Duration in stage:** 267s
+- **Input tokens:** 147,350 (final context: 41,286)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 21%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

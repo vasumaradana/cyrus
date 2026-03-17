@@ -1,18 +1,18 @@
 ---
 id=017-Add-permission-approval-logging
 title=Issue 017: Add permission approval logging
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=209945
-total_output_tokens=55
-total_duration_seconds=975
-total_iterations=70
-run_count=70
+verify_count=1
+total_input_tokens=431308
+total_output_tokens=132
+total_duration_seconds=1929
+total_iterations=73
+run_count=72
 ---
 
 # Issue 017: Add permission approval logging
@@ -780,5 +780,27 @@ CYRUS_LOG_LEVEL=DEBUG python cyrus2/cyrus_brain.py 2>&1 | grep -i "password\|sec
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-17 00:40:39Z
+
+- **From:** PLANNED
+- **Duration in stage:** 285s
+- **Input tokens:** 70,911 (final context: 70,911)
+- **Output tokens:** 26
+- **Iterations:** 1
+- **Context used:** 35%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### BUILT — 2026-03-17 02:30:50Z
+
+- **From:** BUILT
+- **Duration in stage:** 669s
+- **Input tokens:** 150,452 (final context: 61,332)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 31%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

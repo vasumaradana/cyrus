@@ -1,18 +1,18 @@
 ---
 id=021-Write-test-fast-command
 title=Issue 021: Write test_fast_command.py (Tier 1)
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053,054,055,056,057
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=136305
-total_output_tokens=38
-total_duration_seconds=546
-total_iterations=72
-run_count=72
+verify_count=1
+total_input_tokens=332373
+total_output_tokens=89
+total_duration_seconds=1802
+total_iterations=74
+run_count=73
 ---
 
 # Issue 021: Write test_fast_command.py (Tier 1)
@@ -807,6 +807,17 @@ pytest cyrus2/tests/test_fast_command.py -k "switch or rename" -v
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 03:10:34Z
+
+- **From:** BUILT
+- **Duration in stage:** 1256s
+- **Input tokens:** 196,068 (final context: 68,420)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 34%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build
 ## Interview Q&A

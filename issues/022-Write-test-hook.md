@@ -1,18 +1,18 @@
 ---
 id=022-Write-test-hook
 title=Issue 022: Write test_hook.py (Tier 2)
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=046,047,048,049,050,051,052,053,054,055,056,057,058
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=105845
-total_output_tokens=31
-total_duration_seconds=415
-total_iterations=71
-run_count=71
+verify_count=1
+total_input_tokens=169377
+total_output_tokens=57
+total_duration_seconds=721
+total_iterations=72
+run_count=72
 ---
 
 # Issue 022: Write test_hook.py (Tier 2)
@@ -34,13 +34,13 @@ Tier 2 tests for cyrus_hook.py event parsing. Mock stdin and _send() to verify c
 - Issue 018 (conftest.py fixtures)
 
 ## Acceptance Criteria
-- [ ] `cyrus2/tests/test_hook.py` exists with 12+ test cases
-- [ ] Tests cover event types: Stop, PreToolUse, PostToolUse, Notification, PreCompact
-- [ ] Tests verify _send() called with correct arguments for each event
-- [ ] Invalid JSON handling (malformed, missing fields)
-- [ ] Unknown event type handling
-- [ ] Empty/whitespace-only input handling
-- [ ] All tests pass: `pytest tests/test_hook.py -v`
+- [x] `cyrus2/tests/test_hook.py` exists with 12+ test cases
+- [x] Tests cover event types: Stop, PreToolUse, PostToolUse, Notification, PreCompact
+- [x] Tests verify _send() called with correct arguments for each event
+- [x] Invalid JSON handling (malformed, missing fields)
+- [x] Unknown event type handling
+- [x] Empty/whitespace-only input handling
+- [x] All tests pass: `pytest tests/test_hook.py -v`
 
 ## Implementation Steps
 1. Create `cyrus2/tests/test_hook.py`
@@ -799,5 +799,16 @@ pytest cyrus2/tests/test_hook.py -k "error or invalid" -v
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 03:15:41Z
+
+- **From:** BUILT
+- **Duration in stage:** 306s
+- **Input tokens:** 63,532 (final context: 63,532)
+- **Output tokens:** 26
+- **Iterations:** 1
+- **Context used:** 32%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

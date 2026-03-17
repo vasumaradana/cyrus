@@ -40,7 +40,7 @@ Create a minimal, focused `cyrus_log.py` module that centralizes Python logging 
 
 ## Prioritized Tasks
 
-- [ ] Create `cyrus2/cyrus_log.py` with `setup_logging()` function (~40 lines)
+- [x] Create `cyrus2/cyrus_log.py` with `setup_logging()` function (~40 lines)
   - Import `logging`, `sys`, `os`
   - `setup_logging(name: str = "cyrus") -> logging.Logger`
   - Read `CYRUS_LOG_LEVEL` env var, `.upper()`, default "INFO"
@@ -50,9 +50,9 @@ Create a minimal, focused `cyrus_log.py` module that centralizes Python logging 
   - `logging.getLogger(name)` — set level, add handler, `propagate=False`
   - Return the logger
   - Module docstring explaining usage pattern
-- [ ] Create `cyrus2/tests/test_009_cyrus_log.py` with acceptance tests (see table below)
-- [ ] Run Ruff lint + format check on new file
-- [ ] Run all tests and verify they pass
+- [x] Create `cyrus2/tests/test_009_cyrus_log.py` with acceptance tests (see table below)
+- [x] Run Ruff lint + format check on new file
+- [x] Run all tests and verify they pass
 
 ## Acceptance-Driven Tests
 
@@ -94,3 +94,11 @@ Create a minimal, focused `cyrus_log.py` module that centralizes Python logging 
 3. **Env var testing**: Use `unittest.mock.patch.dict(os.environ, ...)` to safely set/unset CYRUS_LOG_LEVEL without affecting other tests.
 4. **Output capture**: Use `io.StringIO` as handler stream replacement or capture stderr to verify format strings produce correct output.
 5. **Follow design spec**: Issue Step 8 says `getattr(logging, name)` — this is incorrect (would look up module attribute, not get logger). Use `logging.getLogger(name)` per the design doc.
+6. **Import path fix (discovered during build)**: Test was initially written with `from cyrus2.cyrus_log import setup_logging` — this fails because `cyrus2` is not an installed package. The established pattern (from `test_007`, `test_008`) is to add `cyrus2/` to `sys.path` via `Path(__file__).parent.parent` and import directly: `from cyrus_log import setup_logging`. Fixed accordingly.
+
+## Validation Results
+
+All validation passed on 2026-03-16:
+- `ruff check` — ✅ All checks passed
+- `ruff format --check` — ✅ 2 files already formatted
+- `pytest tests/ -v` — ✅ 168 tests passed, 0 failed (all 009 tests + full regression suite)
