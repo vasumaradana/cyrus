@@ -1,18 +1,18 @@
 ---
 id=005-Extract-shared-code-into-cyrus-common
 title=Issue 005: Extract shared code into cyrus_common.py
-state=PLANNED
+state=BUILT
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=558396
-total_output_tokens=140
-total_duration_seconds=3489
-total_iterations=73
-run_count=73
+verify_count=1
+total_input_tokens=605497
+total_output_tokens=166
+total_duration_seconds=3625
+total_iterations=74
+run_count=74
 ---
 
 # Issue 005: Extract shared code into cyrus_common.py
@@ -847,6 +847,17 @@ None
 - **Context used:** 43%
 - **Model:** claude-opus-4-6
 - **Trigger:** manual/plan
+
+### BUILT — 2026-03-16 20:47:47Z
+
+- **From:** BUILT
+- **Duration in stage:** 136s
+- **Input tokens:** 47,101 (final context: 47,101)
+- **Output tokens:** 26
+- **Iterations:** 1
+- **Context used:** 24%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
 ## Interview Q&A
 
 1. **Q:** The refactoring of main.py to use service-delegation (required before extraction per the interview)—should this refactoring be a separate issue completed first, or is it part of 005's scope?

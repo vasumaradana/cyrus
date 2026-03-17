@@ -9,9 +9,10 @@ These tests verify every acceptance criterion from the issue:
   - Both [tool.ruff.lint] and [tool.ruff.format] sections are present
 """
 
-import tomllib
 import unittest
 from pathlib import Path
+
+import tomllib
 
 # Resolve pyproject.toml relative to this test file's parent directory (cyrus2/)
 PYPROJECT_PATH = Path(__file__).parent.parent / "pyproject.toml"
@@ -202,9 +203,8 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_select_is_a_list(self):
         """select must be a list, not a string."""
-        select = (
-            self.data.get("tool", {}).get("ruff", {}).get("lint", {}).get("select", None)
-        )
+        ruff = self.data.get("tool", {}).get("ruff", {})
+        select = ruff.get("lint", {}).get("select", None)
         self.assertIsInstance(select, list, "select must be a TOML array")
 
     def test_no_extra_unexpected_keys_in_project(self):

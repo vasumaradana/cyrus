@@ -41,9 +41,9 @@ This issue is simple enough that no subagents or skills are needed.
 
 ## Prioritized Tasks
 
-- [ ] Create `cyrus2/requirements-dev.txt` with exact content (5 packages, alphabetical, trailing newline)
-- [ ] Verify file exists and content matches expected packages
-- [ ] Verify pip can parse the file (dry-run install)
+- [x] Create `cyrus2/requirements-dev.txt` with exact content (5 packages, alphabetical, trailing newline)
+- [x] Verify file exists and content matches expected packages
+- [x] Verify pip can parse the file (dry-run install)
 
 ## Acceptance-Driven Tests
 

@@ -1,7 +1,7 @@
 # Verification: Create pyproject.toml with Ruff Config
 
 **Issue**: [001-Create-pyproject-toml-with-ruff-config](/home/daniel/Projects/barf/cyrus/issues/001-Create-pyproject-toml-with-ruff-config.md)
-**Status**: ALREADY IMPLEMENTED
+**Status**: COMPLETE
 **Created**: 2026-03-16
 
 ## Evidence
@@ -25,11 +25,23 @@
 - [x] File exists at `cyrus2/pyproject.toml`
 - [x] Valid TOML (parsed successfully with Python `tomllib`)
 - [x] All 5 acceptance criteria confirmed
+- [x] `ruff check` passes (BUILD: 0 errors)
+- [x] `ruff format --check` passes (CHECK: already formatted)
+- [x] `pytest` passes (26/26 tests pass)
 
-## Minor Fixes Needed
+## Pre-Complete Check Fix (2026-03-16)
 
-- None. Implementation is complete and matches the issue specification exactly.
+The build/check/test commands failed because:
+1. `.barfrc` used `python` but only `python3` is available on this system
+2. `ruff` and `pytest` were not installed
+
+**Fixes applied:**
+- Updated `.barfrc` commands to use `cyrus2/.venv/bin/python` and scope to `cyrus2/`
+- Created virtual environment at `cyrus2/.venv` using `uv venv`
+- Installed `ruff==0.15.6` and `pytest==9.0.2` into the venv using `uv pip install`
+- Fixed E501 (line too long) in `cyrus2/tests/test_001_pyproject_config.py` line 207 by splitting chained `.get()` call
+- Fixed I001 (unsorted imports) via `ruff --fix`
 
 ## Recommendation
 
-Mark issue complete. All acceptance criteria are satisfied.
+All acceptance criteria satisfied. Build/check/test all pass. Issue is complete.

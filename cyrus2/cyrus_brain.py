@@ -1,5 +1,8 @@
 """
-cyrus_brain.py — Service 2: Logic / VS Code Watcher
+cyrus_brain.py — Service 2: Logic / VS Code Watcher (PRIMARY ENTRY POINT)
+
+This is the recommended entry point for Cyrus. main.py is deprecated; use this
+directly. Pair with cyrus_voice.py for the full split-mode experience.
 
 Manages Claude Code sessions, routes utterances, and reads responses aloud.
 Owns all VS Code UIA interaction. Has no audio hardware dependency.
@@ -25,12 +28,14 @@ Protocol (line-delimited JSON):
 import argparse
 import asyncio
 import json
+import logging
 import os
 import queue as _stdlib_queue
 import re
 import socket
 import threading
 import time
+from dataclasses import dataclass
 
 import comtypes
 import pyautogui
@@ -277,77 +282,212 @@ def _make_session_manager(loop: asyncio.AbstractEventLoop) -> SessionManager:
 # ── Routing helpers ────────────────────────────────────────────────────────────
 
 
+@dataclass
+class CommandResult:
+    """Return value from command handlers — describes what the dispatcher should do.
+
+    Handlers return this instead of mutating globals directly. The dispatcher
+    applies state changes under locks, queues TTS, and prints log messages.
+    """
+
+    spoken: str | None = None  # Text to speak via TTS (None = nothing to say)
+    speak_project: str = ""  # Project name for TTS routing (empty = default)
+    new_active_project: str | None = None  # Set _active_project if not None
+    new_project_locked: bool | None = None  # Set _project_locked if not None
+    skip_tts: bool = False  # True skips TTS queueing entirely
+    log_message: str = ""  # Text to print to console (empty = skip)
+
+
+def _handle_switch_project(
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+    active_project: str,
+) -> CommandResult:
+    """Switch active project and lock routing to it."""
+    logging.debug("Executing command 'switch_project'")
+    target = _resolve_project(cmd.get("project", ""), session_mgr.aliases)
+    if target:
+        session_mgr.on_session_switch(target)
+        text = spoken or f"Switched to {target}. Routing locked."
+        logging.info("Command 'switch_project' completed: locked to '%s'", target)
+        return CommandResult(
+            spoken=text,
+            new_active_project=target,
+            new_project_locked=True,
+            log_message=f"[Brain] {text}",
+        )
+    else:
+        text = f"No session matching '{cmd.get('project', '')}' found."
+        logging.warning("switch_project: no match for '%s'", cmd.get("project", ""))
+        return CommandResult(spoken=text, log_message=f"[Brain] {text}")
+
+
+def _handle_unlock(
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+    active_project: str,
+) -> CommandResult:
+    """Release project lock and return to auto-follow mode."""
+    logging.debug("Executing command 'unlock'")
+    text = spoken or "Following window focus."
+    logging.info("Command 'unlock' completed")
+    return CommandResult(
+        spoken=text,
+        new_project_locked=False,
+        log_message="[Brain] Routing unlocked.",
+    )
+
+
+def _handle_which_project(
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+    active_project: str,
+) -> CommandResult:
+    """Report current active project and lock status."""
+    logging.debug("Executing command 'which_project'")
+    # Read _project_locked under its lock (read-only — no global statement needed)
+    with _project_locked_lock:
+        locked = _project_locked
+    status = "locked" if locked else "following focus"
+    text = spoken or f"Active project: {active_project or 'none'}, {status}."
+    logging.info("Command 'which_project' completed")
+    return CommandResult(spoken=text, log_message=f"[Brain] {text}")
+
+
+def _handle_last_message(
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+    active_project: str,
+) -> CommandResult:
+    """Replay the last response in the active session."""
+    logging.debug("Executing command 'last_message'")
+    resp = session_mgr.last_response(active_project)
+    if resp:
+        logging.info("Command 'last_message' completed: replaying %d chars", len(resp))
+        # Use speak_project so TTS is routed to the correct project session
+        return CommandResult(spoken=resp, speak_project=active_project)
+    else:
+        text = spoken or f"No recorded response for {active_project or 'this session'}."
+        logging.warning("last_message: no recorded response for '%s'", active_project)
+        return CommandResult(spoken=text, log_message=f"[Brain] {text}")
+
+
+def _handle_rename_session(
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+    active_project: str,
+) -> CommandResult:
+    """Rename a project session alias."""
+    logging.debug("Executing command 'rename_session'")
+    new_name = cmd.get("new", "").strip()
+    old_hint = cmd.get("old", "").strip()
+    proj = (
+        _resolve_project(old_hint, session_mgr.aliases) if old_hint else active_project
+    )
+    if proj and new_name:
+        old_alias = next((a for a, p in session_mgr.aliases.items() if p == proj), proj)
+        session_mgr.rename_alias(old_alias, new_name, proj)
+        text = spoken or f"Renamed to '{new_name}'."
+        logging.info("Command 'rename_session' completed: '%s' → '%s'", proj, new_name)
+        return CommandResult(
+            spoken=text,
+            # Print both the alias change and the confirmation
+            log_message=f"[Brain] {proj} → alias '{new_name}'\n[Brain] {text}",
+        )
+    else:
+        text = spoken or "Could not find that session to rename."
+        logging.warning(
+            "rename_session: no project match (proj=%r, new_name=%r)", proj, new_name
+        )
+        return CommandResult(spoken=text, log_message=f"[Brain] {text}")
+
+
+def _handle_pause(
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+    active_project: str,
+) -> CommandResult:
+    """Toggle listening pause state (delegates to voice service)."""
+    logging.debug("Executing command 'pause'")
+    # Delegate to voice service; TTS is handled by voice, not the brain
+    asyncio.run_coroutine_threadsafe(_send({"type": "pause"}), loop)
+    logging.info("Command 'pause' completed")
+    return CommandResult(skip_tts=True)
+
+
+# Dispatch table mapping command type strings → handler functions.
+# To add a new command: write a handler above and add one entry here.
+_COMMAND_HANDLERS: dict[str, object] = {
+    "switch_project": _handle_switch_project,
+    "unlock": _handle_unlock,
+    "which_project": _handle_which_project,
+    "last_message": _handle_last_message,
+    "rename_session": _handle_rename_session,
+    "pause": _handle_pause,
+}
+
+
 def _execute_cyrus_command(
     ctype: str, cmd: dict, spoken: str, session_mgr, loop: asyncio.AbstractEventLoop
 ) -> None:
+    """Execute a Cyrus command using the dispatch table.
+
+    Reads active_project under lock, delegates to the appropriate handler,
+    then applies state mutations under locks and queues TTS based on the
+    returned CommandResult. All handler exceptions are caught and logged —
+    a bad command never crashes the listener.
+    """
     global _active_project, _project_locked
 
-    if ctype == "switch_project":
-        target = _resolve_project(cmd.get("project", ""), session_mgr.aliases)
-        if target:
-            with _active_project_lock:
-                _active_project = target
-            with _project_locked_lock:
-                _project_locked = True
-            session_mgr.on_session_switch(target)
-            spoken = spoken or f"Switched to {target}. Routing locked."
-            print(f"[Brain] {spoken}")
-        else:
-            spoken = f"No session matching '{cmd.get('project', '')}' found."
-            print(f"[Brain] {spoken}")
+    logging.debug("Executing command '%s'", ctype)
 
-    elif ctype == "unlock":
-        with _project_locked_lock:
-            _project_locked = False
-        spoken = spoken or "Following window focus."
-        print("[Brain] Routing unlocked.")
-
-    elif ctype == "which_project":
-        with _active_project_lock:
-            proj_name = _active_project
-        with _project_locked_lock:
-            locked = _project_locked
-        status = "locked" if locked else "following focus"
-        spoken = spoken or f"Active project: {proj_name or 'none'}, {status}."
-        print(f"[Brain] {spoken}")
-
-    elif ctype == "last_message":
-        with _active_project_lock:
-            proj_name = _active_project
-        resp = session_mgr.last_response(proj_name)
-        if resp:
-            asyncio.run_coroutine_threadsafe(_speak_queue.put((proj_name, resp)), loop)
-            return
-        else:
-            spoken = (
-                spoken or f"No recorded response for {proj_name or 'this session'}."
-            )
-            print(f"[Brain] {spoken}")
-
-    elif ctype == "rename_session":
-        new_name = cmd.get("new", "").strip()
-        old_hint = cmd.get("old", "").strip()
-        with _active_project_lock:
-            active = _active_project
-        proj = _resolve_project(old_hint, session_mgr.aliases) if old_hint else active
-        if proj and new_name:
-            old_alias = next(
-                (a for a, p in session_mgr.aliases.items() if p == proj), proj
-            )
-            session_mgr.rename_alias(old_alias, new_name, proj)
-            spoken = spoken or f"Renamed to '{new_name}'."
-            print(f"[Brain] {proj} → alias '{new_name}'")
-        else:
-            spoken = spoken or "Could not find that session to rename."
-        print(f"[Brain] {spoken}")
-
-    elif ctype == "pause":
-        # Delegate to voice service
-        asyncio.run_coroutine_threadsafe(_send({"type": "pause"}), loop)
+    handler = _COMMAND_HANDLERS.get(ctype)
+    if not handler:
+        logging.warning("Unknown command type: '%s'", ctype)
         return
 
-    if spoken:
-        asyncio.run_coroutine_threadsafe(_speak_queue.put(("", spoken)), loop)
+    # Read active_project snapshot under lock — handlers receive it as a parameter
+    # so they never need to access the global directly.
+    with _active_project_lock:
+        active_project = _active_project
+
+    try:
+        result = handler(cmd, spoken, session_mgr, loop, active_project)
+    except Exception:
+        logging.exception("Error executing command '%s'", ctype)
+        return
+
+    logging.info("Command '%s' completed", ctype)
+
+    # Apply state mutations under their respective locks
+    if result.new_active_project is not None:
+        with _active_project_lock:
+            _active_project = result.new_active_project
+    if result.new_project_locked is not None:
+        with _project_locked_lock:
+            _project_locked = result.new_project_locked
+
+    # Queue TTS unless the handler opted out (e.g. pause delegates to voice)
+    if not result.skip_tts and result.spoken:
+        asyncio.run_coroutine_threadsafe(
+            _speak_queue.put((result.speak_project, result.spoken)), loop
+        )
+
+    # Print log message if the handler set one
+    if result.log_message:
+        print(result.log_message)
 
 
 # ── Active window tracker ──────────────────────────────────────────────────────

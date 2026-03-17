@@ -13,3 +13,6 @@ exclude = [".venv", "cyrus-companion"]
 select = ["E", "F", "W", "I", "UP", "B"]
 
 [tool.ruff.format]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

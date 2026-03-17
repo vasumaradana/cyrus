@@ -1,18 +1,18 @@
 ---
 id=003-Create-requirements-dev-txt
 title=Issue 003: Create requirements-dev.txt
-state=PLANNED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=109112
-total_output_tokens=37
-total_duration_seconds=259
-total_iterations=72
-run_count=72
+total_input_tokens=182832
+total_output_tokens=87
+total_duration_seconds=359
+total_iterations=74
+run_count=73
 ---
 
 # Issue 003: Create requirements-dev.txt
@@ -34,10 +34,10 @@ Create `cyrus2/requirements-dev.txt` with development-only dependencies: pytest,
 - None (can be created in parallel with Issue 001-002)
 
 ## Acceptance Criteria
-- [ ] File `cyrus2/requirements-dev.txt` exists
-- [ ] Contains: `pytest`, `pytest-asyncio`, `pytest-mock`, `ruff`
-- [ ] Optional: add pytest-cov for coverage reporting
-- [ ] Can be installed with `pip install -r cyrus2/requirements-dev.txt`
+- [x] File `cyrus2/requirements-dev.txt` exists
+- [x] Contains: `pytest`, `pytest-asyncio`, `pytest-mock`, `ruff`
+- [x] Optional: add pytest-cov for coverage reporting
+- [x] Can be installed with `pip install -r cyrus2/requirements-dev.txt`
 
 ## Implementation Steps
 1. Navigate to cyrus2/ directory: `cd /home/daniel/Projects/barf/cyrus/cyrus2`
@@ -802,3 +802,24 @@ ruff --version
 - **Context used:** 22%
 - **Model:** claude-opus-4-6
 - **Trigger:** manual/plan
+
+### COMPLETE — 2026-03-16 19:11:40Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-16 19:11:40Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 100s
+- **Input tokens:** 73,720 (final context: 37,302)
+- **Output tokens:** 50
+- **Iterations:** 2
+- **Context used:** 19%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** manual/build

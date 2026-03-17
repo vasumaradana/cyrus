@@ -1,18 +1,18 @@
 ---
 id=006-Deprecate-main-py-monolith
 title=Issue 006: Deprecate main.py monolith
-state=PLANNED
+state=BUILT
 parent=
-children=
+children=045
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=420604
-total_output_tokens=143
-total_duration_seconds=1375
-total_iterations=71
-run_count=71
+verify_count=1
+total_input_tokens=687605
+total_output_tokens=265
+total_duration_seconds=1894
+total_iterations=77
+run_count=74
 ---
 
 # Issue 006: Deprecate main.py monolith
@@ -836,3 +836,36 @@ After common code extraction (Issue 005), `main.py` becomes redundant. The split
 - **Context used:** 25%
 - **Model:** claude-opus-4-6
 - **Trigger:** manual/plan
+
+### PLANNED — 2026-03-16 21:56:22Z
+
+- **From:** PLANNED
+- **Duration in stage:** 154s
+- **Input tokens:** 85,891 (final context: 44,758)
+- **Output tokens:** 37
+- **Iterations:** 2
+- **Context used:** 22%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-16 22:07:43Z
+
+- **From:** PLANNED
+- **Duration in stage:** 257s
+- **Input tokens:** 94,948 (final context: 41,215)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 21%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### BUILT — 2026-03-17 00:03:49Z
+
+- **From:** BUILT
+- **Duration in stage:** 108s
+- **Input tokens:** 86,162 (final context: 44,761)
+- **Output tokens:** 34
+- **Iterations:** 2
+- **Context used:** 22%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build

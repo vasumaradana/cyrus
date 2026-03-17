@@ -1,0 +1,10 @@
+edge-tts==7.2.7
+faster-whisper==1.2.1
+keyboard==0.13.5
+numpy==2.4.3
+pygame-ce==2.5.7
+python-dotenv==1.2.2
+silero-vad==6.2.1
+sounddevice==0.5.5
+torch==2.10.0
+websockets==16.0
