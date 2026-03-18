@@ -2,6 +2,7 @@
 
 **Issue**: [028-Add-TCP-authentication-2](/home/daniel/Projects/barf/cyrus/issues/028-Add-TCP-authentication-2.md)
 **Created**: 2026-03-17
+**Status**: COMPLETE (2026-03-18)
 **PROMPT**: Planning phase
 
 ## Gap Analysis
@@ -82,7 +83,8 @@ The auth infrastructure is fully in place from 028-1. This issue is about **comp
 - [x] 9. Fix ruff errors in `test_028_tcp_authentication.py` (E501, E741, F401) (already fixed before build phase)
 - [x] 10. Fix ruff errors in `test_companion_protocol.py` (E501) (already fixed before build phase)
 - [x] 11. Run `uv run ruff check .` — passes clean (0 errors; also fixed remaining 24 errors in cyrus_hook.py, cyrus_voice.py, main.py, probe_uia.py, test_permission_scan.py, .claude/skills/)
-- [x] 12. Run `uv run pytest cyrus2/tests/` — all 745 tests pass
+- [x] 12. Run `uv run pytest cyrus2/tests/` — all 732 tests pass
+- [x] 13. Strengthen hook rejection tests — added `assertIn(b"unauthorized", all_written)` to `test_brain_hook_rejects_wrong_token` and `test_brain_hook_rejects_missing_token` to fully verify AC2
 
 ## Acceptance-Driven Tests
 

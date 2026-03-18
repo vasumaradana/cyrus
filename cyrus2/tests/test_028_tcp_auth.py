@@ -383,7 +383,11 @@ class TestBrainHookAuth(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn(b"unauthorized", all_written.lower())
 
     async def test_brain_hook_rejects_wrong_token(self) -> None:
-        """AC: handle_hook_connection closes connection when token is wrong."""
+        """AC: handle_hook_connection sends unauthorized error on wrong token.
+
+        Per auth protocol spec, the handler must both send {"error": "unauthorized"}
+        to the client AND close the connection — not just disconnect silently.
+        """
         with patch.dict(os.environ, {"CYRUS_AUTH_TOKEN": self._TOKEN}):
             importlib.reload(cyrus_config)
 
@@ -399,11 +403,22 @@ class TestBrainHookAuth(unittest.IsolatedAsyncioTestCase):
 
             await cyrus_brain.handle_hook_connection(reader, writer, session_mgr)
 
-            # writer.close() must have been called (disconnect)
+            # Must have written {"error": "unauthorized"} to client (AC2)
+            all_written = b"".join(written)
+            self.assertIn(
+                b"unauthorized",
+                all_written,
+                "handle_hook_connection must write unauthorized error on wrong token",
+            )
+            # Must have disconnected after sending the error
             writer.close.assert_called()
 
     async def test_brain_hook_rejects_missing_token(self) -> None:
-        """AC: handle_hook_connection closes connection when token field absent."""
+        """AC: handle_hook_connection sends unauthorized error when token field absent.
+
+        Missing token is treated the same as wrong token — send the generic error
+        response and close, never expose what the expected token value is.
+        """
         with patch.dict(os.environ, {"CYRUS_AUTH_TOKEN": self._TOKEN}):
             importlib.reload(cyrus_config)
 
@@ -418,6 +433,13 @@ class TestBrainHookAuth(unittest.IsolatedAsyncioTestCase):
 
             await cyrus_brain.handle_hook_connection(reader, writer, session_mgr)
 
+            # Must have written {"error": "unauthorized"} to client (AC2)
+            all_written = b"".join(written)
+            self.assertIn(
+                b"unauthorized",
+                all_written,
+                "handle_hook_connection must write unauthorized error on missing token",
+            )
             writer.close.assert_called()
 
 
