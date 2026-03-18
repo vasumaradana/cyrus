@@ -1,10 +1,10 @@
 ---
 id=028-Add-TCP-authentication
 title=Issue 028: Add TCP Authentication
-state=PLANNED
+state=SPLIT
 parent=
-children=
-split_count=0
+children=028-Add-TCP-authentication-1,028-Add-TCP-authentication-2,028-Add-TCP-authentication-3
+split_count=1
 force_split=false
 needs_interview=false
 verify_count=0
