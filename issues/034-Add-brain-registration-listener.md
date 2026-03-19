@@ -1,18 +1,18 @@
 ---
 id=034-Add-brain-registration-listener
 title=Issue 034: Add Brain Registration Listener
-state=PLANNED
+state=COMPLETE
 parent=
-children=
+children=049,050,057,058,059,060,061,062,063,064
 split_count=0
 force_split=false
 needs_interview=false
-verify_count=0
-total_input_tokens=180747
-total_output_tokens=59
-total_duration_seconds=874
-total_iterations=80
-run_count=80
+verify_count=1
+total_input_tokens=368063
+total_output_tokens=102
+total_duration_seconds=2037
+total_iterations=82
+run_count=81
 ---
 
 # Issue 034: Add Brain Registration Listener
@@ -969,3 +969,24 @@ Implement an async TCP server on port 8770 in `cyrus2/cyrus_brain.py` to accept 
 - **Context used:** 23%
 - **Model:** claude-opus-4-6
 - **Trigger:** auto/plan
+
+### BUILT — 2026-03-18 23:46:19Z
+
+- **From:** BUILT
+- **Duration in stage:** 1163s
+- **Input tokens:** 187,316 (final context: 64,492)
+- **Output tokens:** 43
+- **Iterations:** 2
+- **Context used:** 32%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### COMPLETE — 2026-03-19 19:02:34Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify

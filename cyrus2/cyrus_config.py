@@ -47,6 +47,9 @@ COMPANION_PORT: int = int(os.environ.get("CYRUS_COMPANION_PORT", "8770"))
 # Standalone server (cyrus_server.py) — remote brain for mobile-only setups
 SERVER_PORT: int = int(os.environ.get("CYRUS_SERVER_PORT", "8765"))
 
+# Health check HTTP server — exposes GET /health for Docker/k8s liveness probes
+HEALTH_PORT: int = int(os.environ.get("CYRUS_HEALTH_PORT", "8771"))
+
 # ── Timeout constants ──────────────────────────────────────────────────────────
 # Timeouts are in seconds unless the name includes a different unit.
 
@@ -83,6 +86,32 @@ PERMISSION_WATCHER_POLL_INTERVAL: float = float(
 
 # Hard cap on spoken words in a TTS call (~12 s at 150 wpm)
 MAX_SPEECH_WORDS: int = int(os.environ.get("CYRUS_MAX_SPEECH_WORDS", "200"))
+
+# ── Whisper speech-to-text ─────────────────────────────────────────────────────
+# English-only model variants in ascending size order.  The default (medium.en)
+# gives good accuracy; use tiny.en or base.en on CPU-constrained hardware.
+
+VALID_WHISPER_MODELS: list[str] = ["tiny.en", "base.en", "small.en", "medium.en"]
+
+WHISPER_MODEL: str = os.environ.get("CYRUS_WHISPER_MODEL", "medium.en")
+
+if WHISPER_MODEL not in VALID_WHISPER_MODELS:
+    print(
+        f"WARN: CYRUS_WHISPER_MODEL={WHISPER_MODEL!r} not in {VALID_WHISPER_MODELS}",
+        file=sys.stderr,
+    )
+    print(
+        "      Using default: medium.en",
+        file=sys.stderr,
+    )
+    WHISPER_MODEL = "medium.en"
+
+# ── Session state persistence ─────────────────────────────────────────────────
+# Path to the JSON file where brain session state (aliases, pending queues,
+# project mappings) is saved on shutdown and restored on startup.
+# Leave empty to use the default: ~/.cyrus/state.json
+
+CYRUS_STATE_FILE: str = os.environ.get("CYRUS_STATE_FILE", "")
 
 # ── Headless mode ─────────────────────────────────────────────────────────────
 # When True, all Windows GUI libraries (comtypes, pyautogui, pygetwindow,

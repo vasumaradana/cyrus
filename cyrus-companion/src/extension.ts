@@ -23,6 +23,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as child_process from 'child_process';
 import { promisify } from 'util';
+import { BrainConnectionManager } from './brain-connection';
+import { createFocusHandler } from './focus-tracker';
+import { handleBrainMessage as dispatchBrainMessage } from './permission-handler';
 
 const execAsync = promisify(child_process.exec);
 
@@ -39,6 +42,7 @@ const FOCUS_CANDIDATES: readonly string[] = [
 let server: net.Server | undefined;
 let cleanupPath: string | undefined;   // discovery file (Windows) or socket file (Unix)
 let out: vscode.OutputChannel;
+let brainManager: BrainConnectionManager | undefined;
 
 // ── Activation / deactivation ─────────────────────────────────────────────────
 
@@ -51,15 +55,43 @@ export function activate(context: vscode.ExtensionContext): void {
     out.appendLine(`[Cyrus] Workspace: ${workspaceName}  (safe: ${safe})`);
 
     startServer(safe)
-        .then(() => out.appendLine('[Cyrus] Ready.'))
+        .then(listenPort => {
+            out.appendLine('[Cyrus] Ready.');
+            // Connect to brain after the inbound server is up so we can include our port.
+            brainManager = new BrainConnectionManager(
+                workspaceName, safe, listenPort, out,
+                () => ({
+                    brainHost: vscode.workspace
+                        .getConfiguration('cyrusCompanion')
+                        .get<string>('brainHost', 'localhost'),
+                    brainPort: vscode.workspace
+                        .getConfiguration('cyrusCompanion')
+                        .get<number>('brainPort', 8770),
+                }),
+                handleBrainMessage,
+            );
+            brainManager.connect();
+        })
         .catch(err => {
             const msg = err instanceof Error ? err.message : String(err);
             out.appendLine(`[Cyrus] FAILED to start: ${msg}`);
             vscode.window.showWarningMessage(`Cyrus Companion: ${msg}`);
         });
 
+    // Register focus/blur tracking so the brain knows which workspace window is active.
+    // The handler guards against a null brainManager (safe to register before connect()).
+    const focusDisposable = vscode.window.onDidChangeWindowState(
+        createFocusHandler(
+            () => brainManager,
+            () => vscode.workspace.workspaceFolders?.[0]?.name ?? 'default',
+            out,
+        ),
+    );
+
+    context.subscriptions.push(focusDisposable);
     context.subscriptions.push({
         dispose: () => {
+            brainManager?.destroy();
             server?.close();
             tryUnlink(cleanupPath);
         },
@@ -67,23 +99,26 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
+    brainManager?.destroy();
     server?.close();
     tryUnlink(cleanupPath);
 }
 
 // ── Platform-adaptive server start ────────────────────────────────────────────
 
-async function startServer(safe: string): Promise<void> {
+/** Start the inbound server and return the listen port (TCP port on Windows, 0 on Unix). */
+async function startServer(safe: string): Promise<number> {
     server = net.createServer(handleConnection);
 
     if (os.platform() === 'win32') {
-        await startTcp(server, safe);
+        return startTcp(server, safe);
     } else {
-        await startUnixSocket(server, safe);
+        return startUnixSocket(server, safe);
     }
 }
 
-async function startTcp(srv: net.Server, safe: string): Promise<void> {
+/** Start TCP server, write discovery file, return bound port. */
+async function startTcp(srv: net.Server, safe: string): Promise<number> {
     const dir = discoveryDir();
     const discoveryFile = path.join(dir, `companion-${safe}.port`);
 
@@ -94,9 +129,11 @@ async function startTcp(srv: net.Server, safe: string): Promise<void> {
 
     out.appendLine(`[Cyrus] TCP 127.0.0.1:${port}`);
     out.appendLine(`[Cyrus] Discovery: ${discoveryFile}`);
+    return port;
 }
 
-async function startUnixSocket(srv: net.Server, safe: string): Promise<void> {
+/** Start Unix socket server; returns 0 (port not meaningful for socket transport). */
+async function startUnixSocket(srv: net.Server, safe: string): Promise<number> {
     const sockPath = path.join(os.tmpdir(), `cyrus-companion-${safe}.sock`);
     tryUnlink(sockPath);
 
@@ -110,6 +147,7 @@ async function startUnixSocket(srv: net.Server, safe: string): Promise<void> {
 
     cleanupPath = sockPath;
     out.appendLine(`[Cyrus] Socket: ${sockPath}`);
+    return 0;   // Port not meaningful for Unix socket transport
 }
 
 // ── TCP port scan ─────────────────────────────────────────────────────────────
@@ -371,6 +409,19 @@ async function tryKeyboardSim(): Promise<Result> {
     } catch (err) {
         return { ok: false, error: `keyboard sim failed: ${err}` };
     }
+}
+
+// ── Brain message handler ─────────────────────────────────────────────────────
+
+/**
+ * Handle an incoming message from the Cyrus Brain.
+ * Delegates to permission-handler.ts which handles permission_respond and
+ * prompt_respond message types via platform-adaptive keyboard simulation.
+ *
+ * @param msg Parsed JSON message from the brain.
+ */
+function handleBrainMessage(msg: unknown): void {
+    dispatchBrainMessage(msg, out);
 }
 
 // ── Utility ───────────────────────────────────────────────────────────────────

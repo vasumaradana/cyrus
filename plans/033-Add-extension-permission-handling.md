@@ -38,7 +38,7 @@ Add `handleBrainMessage()` and `simulateKeyPress()` directly to `extension.ts`, 
 
 ## Prioritized Tasks
 
-- [ ] 1. Add `simulateKeyPress(key: string)` function to `extension.ts`
+- [x] 1. Add `simulateKeyPress(key: string)` function to `permission-handler.ts`
   - Platform switch: `os.platform()` → win32/darwin/linux
   - Key `'1'`: SendKeys('1') / keystroke "1" / xdotool key 1
   - Key `'Escape'`: SendKeys('{ESC}') / key code 53 / xdotool key Escape
@@ -46,26 +46,26 @@ Add `handleBrainMessage()` and `simulateKeyPress()` directly to `extension.ts`, 
   - Log success with action taken
   - Timeout: 3000ms per exec
 
-- [ ] 2. Add `handleBrainMessage(msg: any)` function to `extension.ts`
+- [x] 2. Add `handleBrainMessage(msg: any)` function to `permission-handler.ts`
   - Check `msg.type`
   - `'permission_respond'`: log action, call `simulateKeyPress('1')` for allow, `simulateKeyPress('Escape')` for deny
   - `'prompt_respond'`: log text preview, stub for future (paste text + Enter)
   - Unknown types: silently ignore (or log)
 
-- [ ] 3. Export both functions for testability
-  - `handleBrainMessage` needs access to `out` (module-level state) — keep as module function
+- [x] 3. Export both functions for testability
+  - Extracted to `permission-handler.ts` module with Logger + ExecFn dependency injection
+  - `extension.ts` wires them in via `dispatchBrainMessage(msg, out)`
 
-- [ ] 4. Create `src/brain-message-handler.test.ts` (or add to extension test)
-  - Mock `child_process.exec` to verify correct commands are called
-  - Mock `os.platform()` to test all three platforms
-  - Mock `out.appendLine` to verify logging
-  - Test each acceptance criterion
+- [x] 4. Create `src/permission-handler.test.ts`
+  - Mock `child_process.exec` via exec injection parameter
+  - Mock `os.platform()` via `jest.mock('os', ...)`
+  - Mock logger (makeLogger() helper)
+  - 65 tests total across 3 suites; all pass
 
-- [ ] 5. Add Jest configuration if not present
-  - Add `jest.config.js` and test script to `package.json`
-  - Add `ts-jest` and `@types/jest` to devDependencies if needed
+- [x] 5. Jest configuration — already present in package.json
+  - `ts-jest` preset, `testEnvironment: node`, `roots: src`, `testMatch: **/*.test.ts`
 
-- [ ] 6. Compile and verify: `npm run compile`
+- [x] 6. Compile and verify: `npm run compile` — passes with 0 errors
 
 ## Acceptance-Driven Tests
 
@@ -83,15 +83,17 @@ Add `handleBrainMessage()` and `simulateKeyPress()` directly to `extension.ts`, 
 **No cheating** — cannot claim done without required tests passing.
 
 ## Validation (Backpressure)
-- Tests: All Jest tests pass (permission handling + key simulation)
-- Lint: TypeScript compiles cleanly (`npm run compile`)
-- Build: Extension compiles without errors
+- [x] Tests: All 65 Jest tests pass (3 suites: brain-connection, focus-tracking, permission-handler)
+- [x] Lint: TypeScript compiles cleanly (`npm run compile` — 0 errors)
+- [x] Build: Extension compiles without errors
+- [x] Coverage: 99.18% statements, 92.5% branches, 100% functions (threshold: 80%)
 
 ## Files to Create/Modify
-- `cyrus-companion/src/extension.ts` — Add `handleBrainMessage()` and `simulateKeyPress()` functions
-- `cyrus-companion/src/permission-handler.test.ts` — New: unit tests for permission handling (or inline in extension if preferred)
-- `cyrus-companion/package.json` — Add test script + jest/ts-jest devDependencies if missing
-- `cyrus-companion/jest.config.js` — New: Jest configuration (if not exists)
+- [x] `cyrus-companion/src/permission-handler.ts` — New: `simulateKeyPress()` and `handleBrainMessage()` with Logger/ExecFn injection
+- [x] `cyrus-companion/src/extension.ts` — Updated: replaced stub with `dispatchBrainMessage(msg, out)` import
+- [x] `cyrus-companion/src/permission-handler.test.ts` — New: 34 unit tests, all passing
+- `cyrus-companion/package.json` — No changes needed (jest config already present)
+- `cyrus-companion/jest.config.js` — Not needed (config inline in package.json)
 
 ## Implementation Details
 

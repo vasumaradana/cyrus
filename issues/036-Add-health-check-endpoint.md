@@ -1,18 +1,18 @@
 ---
 id=036-Add-health-check-endpoint
 title=Issue 036: Add Health Check Endpoint
-state=GROOMED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=198274
-total_output_tokens=62
-total_duration_seconds=879
-total_iterations=78
-run_count=78
+total_input_tokens=443512
+total_output_tokens=156
+total_duration_seconds=2099
+total_iterations=84
+run_count=83
 ---
 
 # Issue 036: Add Health Check Endpoint
@@ -901,6 +901,69 @@ Implement a simple HTTP `/health` endpoint on the brain that returns JSON status
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### GROOMED — 2026-03-18 20:39:42Z
+
+- **From:** GROOMED
+- **Duration in stage:** 163s
+- **Input tokens:** 38,447 (final context: 38,447)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 19%
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### PLANNED — 2026-03-18 20:43:00Z
+
+- **From:** PLANNED
+- **Duration in stage:** 158s
+- **Input tokens:** 41,612 (final context: 41,612)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 21%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### PLANNED — 2026-03-19 00:41:38Z
+
+- **From:** PLANNED
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-19 00:42:33Z
+
+- **From:** PLANNED
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### COMPLETE — 2026-03-19 01:09:39Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-19 01:09:39Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 899s
+- **Input tokens:** 165,179 (final context: 49,913)
+- **Output tokens:** 44
+- **Iterations:** 2
+- **Context used:** 25%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build
 ## Interview Q&A

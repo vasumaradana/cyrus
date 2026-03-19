@@ -1,18 +1,18 @@
 ---
 id=031-Add-companion-extension-registration
 title=Issue 031: Add Companion Extension Registration
-state=PLANNED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=199837
-total_output_tokens=75
-total_duration_seconds=715
-total_iterations=81
-run_count=81
+total_input_tokens=324611
+total_output_tokens=109
+total_duration_seconds=1147
+total_iterations=83
+run_count=82
 ---
 
 # Issue 031: Add Companion Extension Registration
@@ -957,3 +957,24 @@ Enhance the companion extension to initiate outbound connection to the brain on 
 - **Context used:** 28%
 - **Model:** claude-opus-4-6
 - **Trigger:** manual/plan
+
+### COMPLETE — 2026-03-18 23:14:50Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-18 23:14:50Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 432s
+- **Input tokens:** 124,774 (final context: 29,504)
+- **Output tokens:** 34
+- **Iterations:** 2
+- **Context used:** 15%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build

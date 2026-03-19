@@ -44,20 +44,20 @@
 | Lint validation | `python-linting` skill | ruff check enforcement |
 
 ## Prioritized Tasks
-- [ ] 1. Add `WHISPER_MODEL` and `VALID_WHISPER_MODELS` to `cyrus2/cyrus_config.py`:
+- [x] 1. Add `WHISPER_MODEL` and `VALID_WHISPER_MODELS` to `cyrus2/cyrus_config.py`:
   - New section "Whisper speech-to-text" after Miscellaneous
   - `VALID_WHISPER_MODELS: list[str] = ["tiny.en", "base.en", "small.en", "medium.en"]`
   - `WHISPER_MODEL: str = os.environ.get("CYRUS_WHISPER_MODEL", "medium.en")`
   - Validation: if not in list, print warning to stderr, reset to `"medium.en"`
-- [ ] 2. Document `CYRUS_WHISPER_MODEL` in `cyrus2/.env.example`:
+- [x] 2. Document `CYRUS_WHISPER_MODEL` in `cyrus2/.env.example`:
   - New section "Whisper speech-to-text" before Authentication
   - Include model sizes: tiny.en (39M), base.en (244M), small.en (774M), medium.en (1.5GB, default)
-- [ ] 3. Update `cyrus2/cyrus_voice.py`:
-  - Add `WHISPER_MODEL` to the existing `from cyrus_config import (...)` block (line 39)
+- [x] 3. Update `cyrus2/cyrus_voice.py`:
+  - Add `WHISPER_MODEL` to the existing `from cyrus2.cyrus_config import (...)` block
   - Remove hardcoded `WHISPER_MODEL = "medium.en"` on line 63
   - Keep `WHISPER_DEVICE` and `WHISPER_COMPUTE_TYPE` as-is (they depend on local `_CUDA` detection, not config)
-  - Existing startup log on line 540 already logs the model — no change needed
-- [ ] 4. Write tests in `cyrus2/tests/test_037_whisper_model_config.py`:
+  - Existing startup log already logs the model — no change needed
+- [x] 4. Write tests in `cyrus2/tests/test_037_whisper_model_config.py`:
   - Follow exact pattern from `test_027_cyrus_config.py`
   - Reuse `_reload_with_env()` helper pattern
   - Test default value is `"medium.en"`
@@ -65,8 +65,8 @@
   - Test invalid model falls back to `"medium.en"` with warning
   - Test `VALID_WHISPER_MODELS` list contains exactly the 4 expected models
   - Test `.env.example` contains `CYRUS_WHISPER_MODEL`
-- [ ] 5. Run ruff check and fix any lint issues
-- [ ] 6. Run full test suite to verify no regressions
+- [x] 5. Run ruff check and fix any lint issues
+- [x] 6. Run full test suite to verify no regressions
 
 ## Acceptance-Driven Tests
 | Acceptance Criterion | Required Test | Type |

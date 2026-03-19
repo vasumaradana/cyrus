@@ -1,18 +1,18 @@
 ---
 id=032-Add-extension-focus-tracking
 title=Issue 032: Add Extension Focus Tracking
-state=PLANNED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=150259
-total_output_tokens=58
-total_duration_seconds=429
-total_iterations=80
-run_count=80
+total_input_tokens=262349
+total_output_tokens=101
+total_duration_seconds=754
+total_iterations=82
+run_count=81
 ---
 
 # Issue 032: Add Extension Focus Tracking
@@ -896,3 +896,24 @@ Hook `vscode.window.onDidChangeWindowState` event in the companion extension to 
 - **Context used:** 24%
 - **Model:** claude-opus-4-6
 - **Trigger:** auto/plan
+
+### COMPLETE — 2026-03-18 23:20:15Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-18 23:20:15Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 325s
+- **Input tokens:** 112,090 (final context: 44,871)
+- **Output tokens:** 43
+- **Iterations:** 2
+- **Context used:** 22%
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build

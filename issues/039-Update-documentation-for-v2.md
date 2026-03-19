@@ -1,18 +1,18 @@
 ---
 id=039-Update-documentation-for-v2
 title=Issue 039: Update Documentation for v2
-state=GROOMED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=467741
-total_output_tokens=123
-total_duration_seconds=1821
-total_iterations=78
-run_count=78
+total_input_tokens=678681
+total_output_tokens=212
+total_duration_seconds=2607
+total_iterations=84
+run_count=83
 ---
 
 # Issue 039: Update Documentation for v2
@@ -953,5 +953,68 @@ Update all documentation to reflect Cyrus 2.0 rewrite with new cyrus2/ directory
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### GROOMED — 2026-03-18 20:48:14Z
+
+- **From:** GROOMED
+- **Duration in stage:** 146s
+- **Input tokens:** 39,397 (final context: 39,397)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 20%
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-18 21:06:59Z
+
+- **From:** GROOMED
+- **Duration in stage:** 131s
+- **Input tokens:** 41,085 (final context: 41,085)
+- **Output tokens:** 13
+- **Iterations:** 1
+- **Context used:** 21%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### PLANNED — 2026-03-19 00:41:40Z
+
+- **From:** PLANNED
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-19 00:42:35Z
+
+- **From:** PLANNED
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### COMPLETE — 2026-03-19 01:36:14Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-19 01:36:14Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 509s
+- **Input tokens:** 130,458 (final context: 61,159)
+- **Output tokens:** 51
+- **Iterations:** 2
+- **Context used:** 31%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

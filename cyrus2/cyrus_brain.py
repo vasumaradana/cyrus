@@ -27,23 +27,31 @@ Protocol (line-delimited JSON):
 
 import argparse
 import asyncio
+import atexit
+import contextlib
 import json
 import logging
 import os
 import queue as _stdlib_queue
 import re
+import signal
 import socket
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 # Import cyrus_config first so HEADLESS is available before Windows-specific
 # imports are conditionally loaded.  Importing this module has no side effects
 # (no hardware or GUI access) so it is always safe to import unconditionally.
+from aiohttp import web as _aiohttp_web
+
 from cyrus_config import (
     AUTH_TOKEN,
     BRAIN_PORT,
+    COMPANION_PORT,
     HEADLESS,
+    HEALTH_PORT,
     HOOK_PORT,
     MOBILE_PORT,
     validate_auth_token,
@@ -93,6 +101,7 @@ if not HEADLESS:
             )
             raise
 
+import cyrus_common as _cyrus_common_module
 from cyrus_common import (
     _CHAT_INPUT_HINT,
     VOICE_HINT,
@@ -131,6 +140,35 @@ BRAIN_HOST = "0.0.0.0"
 
 _active_project: str = ""
 _active_project_lock: threading.Lock = threading.Lock()
+
+# ── Companion extension sessions ───────────────────────────────────────────────
+
+
+@dataclass
+class SessionInfo:
+    """Tracks a connected companion extension session.
+
+    Holds the asyncio StreamWriter for the active TCP connection so the
+    brain can send messages back to the companion. The created_at timestamp
+    allows stale sessions to be identified.
+    """
+
+    workspace: str
+    safe: str
+    port: int
+    connection: asyncio.StreamWriter
+    created_at: float = 0.0
+
+    def __post_init__(self) -> None:
+        """Set created_at to current time if not explicitly provided."""
+        if self.created_at == 0.0:
+            self.created_at = time.time()
+
+
+# Registration sessions: workspace name → SessionInfo for active companion connections
+_registered_sessions: dict[str, "SessionInfo"] = {}
+# Protects all reads/writes to _registered_sessions from concurrent async handlers.
+_sessions_lock: threading.Lock = threading.Lock()
 
 _vscode_win_cache: dict = {}
 # Protects all reads/writes to _vscode_win_cache from the submit thread and
@@ -1302,6 +1340,297 @@ async def handle_voice_connection(
             pass
 
 
+# ── Companion extension registration handler ───────────────────────────────────
+
+
+async def _handle_registration_client(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+) -> None:
+    """Handle one companion extension connection on COMPANION_PORT.
+
+    Reads line-delimited JSON messages and dispatches on type:
+    - register: authenticate and track session in _registered_sessions
+    - focus: set _active_project to the workspace name
+    - blur: clear _active_project if it matches the workspace
+    - permission_respond: log and route to PermissionWatcher (stub)
+    - prompt_respond: log and route to waiting code (stub)
+
+    On disconnect (EOF or exception), removes the session from both
+    cyrus_brain._registered_sessions and cyrus_common._registered_sessions.
+    """
+    peer = writer.get_extra_info("peername")
+    addr = f"{peer[0]}:{peer[1]}" if peer else "unknown"
+    log.info("[REG] New connection from %s", addr)
+
+    session_workspace: str | None = None
+    authenticated = False
+
+    try:
+        while True:
+            data = await reader.readline()
+            if not data:
+                break  # EOF — client disconnected
+
+            try:
+                msg = json.loads(data.decode().strip())
+            except json.JSONDecodeError:
+                log.debug("[REG] Skipping malformed JSON line from %s", addr)
+                continue
+
+            msg_type = msg.get("type", "")
+
+            # ── Authentication ─────────────────────────────────────────────
+            # First message must be "register" with a valid auth token.
+            # Subsequent messages on an authenticated connection don't need
+            # to re-send the token.
+            if not authenticated:
+                if msg_type == "register":
+                    received_token = msg.get("token", "")
+                    if not validate_auth_token(received_token):
+                        log.warning(
+                            "[REG] Connection rejected: invalid auth token from %s",
+                            addr,
+                        )
+                        writer.write(
+                            json.dumps({"error": "unauthorized"}).encode() + b"\n"
+                        )
+                        writer.close()
+                        return
+                    authenticated = True
+                else:
+                    # Non-register first message: reject unauthenticated
+                    log.warning(
+                        "[REG] Unexpected first message type %r from %s"
+                        " — expected register",
+                        msg_type,
+                        addr,
+                    )
+                    writer.write(json.dumps({"error": "unauthorized"}).encode() + b"\n")
+                    writer.close()
+                    return
+
+            if msg_type == "register":
+                workspace = msg.get("workspace", "unknown")
+                safe = msg.get("safe", workspace)
+                port = msg.get("port", 8768)
+
+                info = SessionInfo(
+                    workspace=workspace,
+                    safe=safe,
+                    port=port,
+                    connection=writer,
+                )
+                with _sessions_lock:
+                    _registered_sessions[workspace] = info
+                # Also update cyrus_common._registered_sessions for
+                # _vs_code_windows() compat — expects {workspace: "workspace - VS Code"}
+                _cyrus_common_module._registered_sessions[workspace] = (
+                    f"{workspace} - Visual Studio Code"
+                )
+                session_workspace = workspace
+                log.info("[REG] %s registered (port %s)", workspace, port)
+
+            elif msg_type == "focus":
+                workspace = msg.get("workspace")
+                if workspace:
+                    global _active_project
+                    with _active_project_lock:
+                        _active_project = workspace
+                    log.info("[REG] Active project: %s", workspace)
+
+            elif msg_type == "blur":
+                workspace = msg.get("workspace")
+                if workspace:
+                    with _active_project_lock:
+                        if _active_project == workspace:
+                            _active_project = ""
+                            log.info(
+                                "[REG] Blur: %s (active project cleared)",
+                                workspace,
+                            )
+                        else:
+                            log.debug(
+                                "[REG] Blur: %s (not active, current=%s)",
+                                workspace,
+                                _active_project,
+                            )
+
+            elif msg_type == "permission_respond":
+                action = msg.get("action", "")
+                log.info(
+                    "[REG] permission_respond: action=%s (workspace=%s)",
+                    action,
+                    session_workspace,
+                )
+                # TODO: route to PermissionWatcher when full watcher integration lands
+
+            elif msg_type == "prompt_respond":
+                text = msg.get("text", "")
+                preview = text[:50] if text else ""
+                log.info(
+                    "[REG] prompt_respond: %s... (workspace=%s)",
+                    preview,
+                    session_workspace,
+                )
+                # TODO: route to waiting prompt handler when prompt flow is implemented
+
+            else:
+                log.debug("[REG] Unknown message type %r from %s", msg_type, addr)
+
+    except Exception as e:
+        log.error("[REG] Error handling connection from %s: %s", addr, e, exc_info=True)
+    finally:
+        if session_workspace:
+            with _sessions_lock:
+                _registered_sessions.pop(session_workspace, None)
+            _cyrus_common_module._registered_sessions.pop(session_workspace, None)
+            log.info("[REG] %s disconnected", session_workspace)
+        try:
+            writer.close()
+        except Exception:
+            pass
+
+
+# ── Session state persistence ──────────────────────────────────────────────────
+
+
+def _get_state_file() -> Path:
+    """Resolve and return the session state file path.
+
+    Reads ``CYRUS_STATE_FILE`` from the environment at call time so tests and
+    operators can override the path without reloading the module.  If the var
+    is set to a non-empty string that path is returned directly; otherwise the
+    default ``~/.cyrus/state.json`` is used and its parent directory is created.
+
+    Returns:
+        A ``pathlib.Path`` pointing to the state file location.
+    """
+    # Read at call-time (not module import) so env overrides take effect.
+    custom = os.environ.get("CYRUS_STATE_FILE", "")
+    if custom:
+        return Path(custom)
+    default = Path.home() / ".cyrus" / "state.json"
+    # Create parent directory on first run — safe if it already exists.
+    default.parent.mkdir(parents=True, exist_ok=True)
+    return default
+
+
+def _save_state(session_mgr: "SessionManager") -> None:
+    """Serialize brain session state to disk using an atomic write.
+
+    Collects aliases, pending queues, and project names from ``session_mgr``
+    and writes them to the state file as JSON.  Uses a write-to-temp-then-
+    rename strategy to prevent partial writes from corrupting the file.
+    File permissions are restricted to 0600 on Unix after the write.
+
+    Args:
+        session_mgr: The live ``SessionManager`` instance whose state is saved.
+    """
+    state = {
+        "version": 1,
+        "timestamp": time.time(),
+        "aliases": session_mgr.aliases,  # returns a copy via the property
+        "projects": list(session_mgr._chat_watchers.keys()),
+        "pending_queues": {
+            proj: list(cw._pending_queue)
+            for proj, cw in session_mgr._chat_watchers.items()
+        },
+    }
+
+    state_file = _get_state_file()
+    # Write to a sibling .tmp file first; rename atomically so readers never
+    # see a partially-written state file (POSIX rename(2) is atomic).
+    temp_file = state_file.with_suffix(".tmp")
+
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+        temp_file.replace(state_file)
+        # Restrict read/write to the owner only — state may contain path names.
+        try:
+            state_file.chmod(0o600)
+        except (NotImplementedError, AttributeError):
+            # chmod is a no-op on Windows; silently skip.
+            pass
+        log.info("[State] Saved to %s (%d aliases)", state_file, len(state["aliases"]))
+    except Exception as e:
+        log.error(
+            "[State] Failed to save state to %s: %s",
+            state_file,
+            e,
+            exc_info=True,
+        )
+
+
+def _load_state(session_mgr: "SessionManager") -> None:
+    """Restore brain session state from disk into ``session_mgr``.
+
+    Handles the following failure modes without raising:
+    - Missing state file (normal on first run)
+    - Invalid / corrupted JSON
+    - Unsupported state version
+
+    Aliases are merged into the existing ``session_mgr._aliases`` dict so
+    that any aliases already seeded by ``_init_session()`` are preserved.
+
+    Pending queues are stored in the file for manual recovery but are NOT
+    auto-replayed on startup (per interview Q&A decision) — the user triggers
+    replay by switching to the project ("switch to X").
+
+    Args:
+        session_mgr: The ``SessionManager`` instance to restore state into.
+    """
+    state_file = _get_state_file()
+
+    if not state_file.exists():
+        log.info("[State] No state file at %s — starting fresh", state_file)
+        return
+
+    try:
+        with open(state_file, encoding="utf-8") as f:
+            state = json.load(f)
+    except json.JSONDecodeError as e:
+        log.warning(
+            "[State] Corrupted state file at %s (%s) — starting fresh",
+            state_file,
+            e,
+        )
+        return
+    except Exception as e:
+        log.error(
+            "[State] Failed to read state file %s: %s — starting fresh",
+            state_file,
+            e,
+            exc_info=True,
+        )
+        return
+
+    version = state.get("version", 0)
+    if version != 1:
+        log.warning(
+            "[State] Unsupported state version %s in %s — skipping restore",
+            version,
+            state_file,
+        )
+        return
+
+    # Restore aliases — merge so session-discovery aliases are not overwritten.
+    aliases = state.get("aliases", {})
+    if isinstance(aliases, dict):
+        session_mgr._aliases.update(aliases)
+        log.info("[State] Restored %d aliases from %s", len(aliases), state_file)
+
+    # Pending queues are loaded for informational purposes; not auto-replayed.
+    pending = state.get("pending_queues", {})
+    if pending:
+        log.info(
+            "[State] %d project(s) had pending queues at last shutdown"
+            " (not auto-replayed)",
+            len(pending),
+        )
+
+
 # ── Subsystem initializers ─────────────────────────────────────────────────────
 
 
@@ -1332,6 +1661,35 @@ def _init_session(loop: asyncio.AbstractEventLoop) -> "SessionManager":
         with _active_project_lock:
             _active_project = first[0][0]
     return session_mgr
+
+
+def _init_signal_handlers(
+    loop: asyncio.AbstractEventLoop,
+    session_mgr: "SessionManager",
+) -> None:
+    """Register SIGTERM/SIGINT handlers that save state then stop the event loop.
+
+    Uses ``loop.add_signal_handler()`` for clean asyncio integration on Unix.
+    Falls back to ``atexit.register()`` on Windows where
+    ``add_signal_handler()`` raises ``NotImplementedError``.
+
+    Args:
+        loop: The running asyncio event loop.
+        session_mgr: The live ``SessionManager`` whose state is saved on exit.
+    """
+
+    def _shutdown_handler() -> None:
+        log.info("Shutdown signal received — saving state...")
+        _save_state(session_mgr)
+        loop.stop()
+
+    try:
+        loop.add_signal_handler(signal.SIGTERM, _shutdown_handler)
+        loop.add_signal_handler(signal.SIGINT, _shutdown_handler)
+    except (NotImplementedError, AttributeError):
+        # Windows: asyncio does not support add_signal_handler().
+        # Fall back to atexit so state is saved on normal process exit.
+        atexit.register(_save_state, session_mgr)
 
 
 def _init_background_threads(
@@ -1369,18 +1727,70 @@ def _init_async_tasks(
     asyncio.create_task(routing_loop(session_mgr, loop))
 
 
+async def _start_health_server(host: str) -> "_aiohttp_web.AppRunner":
+    """Start the HTTP health check server on HEALTH_PORT (default 8771).
+
+    Creates an aiohttp application with a single GET /health route that
+    returns brain status as JSON.  All other paths return 404.  Access logs
+    are suppressed (access_log=None) to avoid flooding the log with the
+    frequent probe requests that Docker and Kubernetes send every 30 s.
+
+    The server runs as a non-blocking coroutine integrated with the event loop
+    — no separate thread is needed.
+
+    Args:
+        host: Interface to bind (e.g. ``"0.0.0.0"`` or ``"127.0.0.1"``).
+
+    Returns:
+        The ``AppRunner`` that manages the aiohttp server lifecycle.  Call
+        ``await runner.cleanup()`` to shut down the server gracefully.
+    """
+
+    async def health_handler(
+        request: "_aiohttp_web.Request",
+    ) -> "_aiohttp_web.Response":
+        """Return brain status JSON for liveness probes and monitoring tools."""
+        with _active_project_lock:
+            project = _active_project
+        with _sessions_lock:
+            session_count = len(_registered_sessions)
+        return _aiohttp_web.json_response(
+            {
+                "status": "ok",
+                "timestamp": time.time(),
+                "sessions": session_count,
+                "active_project": project,
+                "headless": HEADLESS,
+            }
+        )
+
+    app = _aiohttp_web.Application()
+    app.router.add_get("/health", health_handler)
+
+    # access_log=None silences per-request access logs that would flood the
+    # output with ~2880 lines/day per container from Docker/k8s health probes.
+    runner = _aiohttp_web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = _aiohttp_web.TCPSite(runner, host, HEALTH_PORT)
+    await site.start()
+    log.info("Health check server listening on %s:%s", host, HEALTH_PORT)
+    return runner
+
+
 async def _init_servers(
     host: str,
     port: int,
     session_mgr: "SessionManager",
     loop: asyncio.AbstractEventLoop,
 ) -> tuple:
-    """Bind TCP and WebSocket servers and print their listening addresses.
+    """Bind TCP, WebSocket, and HTTP health servers; return all server objects.
 
-    Returns (voice_server, hook_server, mobile_server). The first two are
-    asyncio.Server objects that must be kept alive via an async context
-    manager; mobile_server is a websockets.WebSocketServer closed via
-    wait_closed().
+    Returns (voice_server, hook_server, mobile_server, reg_server,
+    health_runner).  The first two are asyncio.Server objects managed via
+    async context managers; mobile_server is a websockets.WebSocketServer
+    closed via wait_closed(); reg_server is an asyncio.Server or None
+    (headless only); health_runner is an aiohttp.AppRunner — call
+    ``await health_runner.cleanup()`` to shut it down.
     """
     # Voice TCP (port 8766) — receives utterances and TTS status from cyrus_voice.py
     voice_server = await asyncio.start_server(
@@ -1410,7 +1820,24 @@ async def _init_servers(
     )
     log.info("Listening for mobile clients on %s:%s (WebSocket)", host, MOBILE_PORT)
 
-    return voice_server, hook_server, mobile_server
+    # Registration TCP (port 8770) — companion extension registers here in
+    # HEADLESS mode. Non-headless uses native window tracking instead.
+    reg_server = None
+    if HEADLESS:
+        reg_server = await asyncio.start_server(
+            _handle_registration_client,
+            host,
+            COMPANION_PORT,
+        )
+        reg_addr = reg_server.sockets[0].getsockname()
+        log.info(
+            "Listening for companion registrations on %s:%s", reg_addr[0], reg_addr[1]
+        )
+
+    # Health HTTP (port 8771) — liveness probes from Docker/k8s hit this endpoint
+    health_runner = await _start_health_server(host)
+
+    return voice_server, hook_server, mobile_server, reg_server, health_runner
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -1438,7 +1865,6 @@ async def main() -> None:
     parser.add_argument("--host", default=BRAIN_HOST, help="Listen host")
     parser.add_argument("--port", type=int, default=BRAIN_PORT, help="Listen port")
     args = parser.parse_args()
-
     loop = asyncio.get_event_loop()
     _speak_queue, _utterance_queue = _init_queues()
     register_chime_handlers(
@@ -1446,19 +1872,26 @@ async def main() -> None:
         listen_chime_fn=lambda: _send_threadsafe({"type": "listen_chime"}, loop),
     )
     session_mgr = _init_session(loop)
+    _load_state(session_mgr)
+    _init_signal_handlers(loop, session_mgr)
     _init_background_threads(session_mgr, loop)
     _init_async_tasks(session_mgr, loop)
-    voice_server, hook_server, mobile_server = await _init_servers(
-        args.host, args.port, session_mgr, loop
-    )
+    servers = await _init_servers(args.host, args.port, session_mgr, loop)
+    voice_server, hook_server, mobile_server, reg_server, health_runner = servers
     log.info("Waiting for voice to connect...")
-
-    async with voice_server, hook_server:
-        await asyncio.gather(
-            voice_server.serve_forever(),
-            hook_server.serve_forever(),
-            mobile_server.wait_closed(),
-        )
+    coros = [
+        voice_server.serve_forever(),
+        hook_server.serve_forever(),
+        mobile_server.wait_closed(),
+    ]
+    async with contextlib.AsyncExitStack() as stack:
+        await stack.enter_async_context(voice_server)
+        await stack.enter_async_context(hook_server)
+        if reg_server is not None:
+            await stack.enter_async_context(reg_server)
+            coros.append(reg_server.serve_forever())
+        stack.push_async_callback(health_runner.cleanup)
+        await asyncio.gather(*coros)
 
 
 if __name__ == "__main__":

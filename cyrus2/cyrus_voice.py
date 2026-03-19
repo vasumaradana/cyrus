@@ -42,6 +42,7 @@ from cyrus2.cyrus_config import (
     SILENCE_WINDOW,
     SPEECH_THRESHOLD,
     TTS_TIMEOUT,
+    WHISPER_MODEL,
 )
 from cyrus2.cyrus_log import setup_logging
 from faster_whisper import WhisperModel
@@ -55,12 +56,12 @@ _CUDA = torch.cuda.is_available()
 _GPU_NAME = torch.cuda.get_device_name(0) if _CUDA else "none"
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-# Port and VAD constants are imported from cyrus_config so they can be overridden
-# via CYRUS_BRAIN_PORT, CYRUS_SPEECH_THRESHOLD, CYRUS_SILENCE_WINDOW, and
-# CYRUS_TTS_TIMEOUT environment variables.
-# BRAIN_PORT, SPEECH_THRESHOLD, SILENCE_WINDOW, TTS_TIMEOUT imported above.
+# Port, VAD, and Whisper model constants are imported from cyrus_config so they
+# can be overridden via CYRUS_BRAIN_PORT, CYRUS_SPEECH_THRESHOLD,
+# CYRUS_SILENCE_WINDOW, CYRUS_TTS_TIMEOUT, and CYRUS_WHISPER_MODEL env vars.
+# BRAIN_PORT, SPEECH_THRESHOLD, SILENCE_WINDOW, TTS_TIMEOUT, WHISPER_MODEL
+# are all imported above.
 
-WHISPER_MODEL = "medium.en"
 WHISPER_DEVICE = "cuda" if _CUDA else "cpu"
 WHISPER_COMPUTE_TYPE = "float16" if _CUDA else "int8"
 SAMPLE_RATE = 16000
@@ -296,7 +297,7 @@ async def tts_worker() -> None:
             await speak(text)
             log.debug("TTS worker done")
         except Exception as e:
-            log.error("TTS worker error: %s", e)
+            log.error("TTS worker error: %s", e, exc_info=True)
 
 
 # ── STT ────────────────────────────────────────────────────────────────────────
@@ -451,7 +452,7 @@ async def brain_reader(reader: asyncio.StreamReader) -> None:
         except json.JSONDecodeError:
             log.debug("Invalid JSON from brain", exc_info=True)
         except Exception as e:
-            log.error("Brain reader error: %s", e)
+            log.error("Brain reader error: %s", e, exc_info=True)
             break
 
 
@@ -561,7 +562,7 @@ async def main() -> None:
             )
             log.info("Kokoro TTS loaded (%s) — voice: %s", _tts_dev, TTS_VOICE)
         except Exception as e:
-            log.warning("Kokoro load failed (%s) — using Edge TTS", e)
+            log.warning("Kokoro load failed (%s) — using Edge TTS", e, exc_info=True)
     else:
         log.warning("Kokoro model not found — using Edge TTS")
 
@@ -608,7 +609,7 @@ async def main() -> None:
             try:
                 await voice_loop(whisper_model, reader, writer, loop)
             except Exception as e:
-                log.warning("Disconnected: %s", e)
+                log.warning("Disconnected: %s", e, exc_info=True)
             finally:
                 global _brain_writer
                 _brain_writer = None
@@ -618,7 +619,9 @@ async def main() -> None:
                 except Exception:
                     log.debug("Writer close error", exc_info=True)
         except Exception as e:
-            log.warning("Cannot connect to brain (%s) — retrying in 3s...", e)
+            log.warning(
+                "Cannot connect to brain (%s) — retrying in 3s...", e, exc_info=True
+            )
         await asyncio.sleep(3)
 
 

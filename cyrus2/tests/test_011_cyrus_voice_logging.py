@@ -286,11 +286,11 @@ class TestSpecificConversions(unittest.TestCase):
         )
 
     def test_tts_worker_error_uses_error(self):
-        """TTS worker error must use log.error."""
+        """TTS worker error must use log.error with exc_info=True."""
         self.assertIn(
-            'log.error("TTS worker error: %s", e)',
+            'log.error("TTS worker error: %s", e, exc_info=True)',
             self.src,
-            "TTS worker error must be log.error with %s format",
+            "TTS worker error must be log.error with %s format and exc_info=True",
         )
 
     def test_hallucination_filtered_uses_debug(self):
@@ -326,11 +326,11 @@ class TestSpecificConversions(unittest.TestCase):
         )
 
     def test_kokoro_load_failed_uses_warning(self):
-        """Kokoro load failed must use log.warning with %s format."""
+        """Kokoro load failed must use log.warning with %s format and exc_info=True."""
         self.assertIn(
-            'log.warning("Kokoro load failed (%s) — using Edge TTS", e)',
+            'log.warning("Kokoro load failed (%s) — using Edge TTS", e, exc_info=True)',
             self.src,
-            "Kokoro load failed must be log.warning with %s format",
+            "Kokoro load failed must be log.warning with %s format and exc_info=True",
         )
 
     def test_transcribing_uses_debug(self):

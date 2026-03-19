@@ -4,7 +4,7 @@ Acceptance-driven tests for Issue 004: Pin All Production Dependencies.
 These tests verify every acceptance criterion from the issue:
   - cyrus2/requirements.txt exists with exactly 7 pinned packages
   - cyrus2/requirements-voice.txt exists with exactly 10 pinned packages
-  - cyrus2/requirements-brain.txt exists with exactly 17 pinned packages (superset)
+  - cyrus2/requirements-brain.txt exists with exactly 18 pinned packages (superset)
   - All packages use exact == pinning (not >= or ~=)
   - Shared packages (python-dotenv, websockets) have identical versions across files
   - Brain file is a superset of both base and voice files
@@ -24,7 +24,7 @@ REQ_BRAIN = CYRUS2_DIR / "requirements-brain.txt"
 # Expected package counts per file
 EXPECTED_BASE_COUNT = 7
 EXPECTED_VOICE_COUNT = 10
-EXPECTED_BRAIN_COUNT = 17
+EXPECTED_BRAIN_COUNT = 18
 
 
 def read_content_lines(path: Path) -> list[str]:

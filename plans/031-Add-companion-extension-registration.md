@@ -58,28 +58,13 @@ issue=031-Add-companion-extension-registration
 
 ## Prioritized Tasks
 
-- [ ] **T1. Add settings and Jest config to package.json** — Add `cyrusCompanion.brainHost` (string, default "localhost") and `cyrusCompanion.brainPort` (integer, default 8770) to `contributes.configuration.properties`. Add Jest devDependencies (`jest`, `ts-jest`, `@types/jest`). Add `jest` config section and `test` script.
-- [ ] **T2. Create `src/__mocks__/vscode.ts`** — Minimal VS Code API mock for Jest. Reference: `out/__mocks__/vscode.js`. Exports: workspace (with getConfiguration mock), window (with createOutputChannel mock), commands, env (with clipboard).
-- [ ] **T3. Create `src/brain-connection.ts`** — BrainConnectionManager class with:
-  - Constructor: `(workspace, safe, listenPort, logger, getConfig, onMessage?)`
-  - Public: `connect()`, `destroy()`
-  - Private: `onConnected()`, `scheduleReconnect()`, `dispatchLine()`
-  - Constants: `INITIAL_BACKOFF_MS = 1000`, `MAX_BACKOFF_MS = 30000`
-  - Logger interface: `{ appendLine(msg: string): void }`
-  - Config getter: `() => { brainHost: string, brainPort: number }`
-  - Reference: `out/brain-connection.js`
-- [ ] **T4. Create `src/brain-connection.test.ts`** — Jest tests covering all 14 test cases from compiled reference. Tests grouped by: happy path (3), reconnect backoff (4), error cases (4), incoming messages (3), edge cases (2). Reference: `out/brain-connection.test.js`.
-- [ ] **T5. Update `src/extension.ts`** — Integration changes:
-  - Add `import { BrainConnectionManager } from './brain-connection';`
-  - Add `let brainManager: BrainConnectionManager | undefined;` module state
-  - Change `startServer()` return type: `Promise<void>` → `Promise<number>`
-  - `startTcp()` returns the bound port number
-  - `startUnixSocket()` returns 0
-  - In `activate()`, `.then(listenPort => ...)` creates BrainConnectionManager, calls `.connect()`
-  - In dispose and deactivate, call `brainManager?.destroy()`
-  - Add `handleBrainMessage(msg: any)` stub function
-- [ ] **T6. Compile** — Run `npm run compile` to verify TypeScript compiles without errors
-- [ ] **T7. Run tests** — Run Jest tests and verify all 14 pass
+- [x] **T1. Add settings and Jest config to package.json** — Add `cyrusCompanion.brainHost` (string, default "localhost") and `cyrusCompanion.brainPort` (integer, default 8770) to `contributes.configuration.properties`. Add Jest devDependencies (`jest`, `ts-jest`, `@types/jest`). Add `jest` config section and `test` script.
+- [x] **T2. Create `src/__mocks__/vscode.ts`** — Minimal VS Code API mock for Jest. Exports: workspace (with getConfiguration mock), window (with createOutputChannel mock), commands, env (with clipboard).
+- [x] **T3. Create `src/brain-connection.ts`** — BrainConnectionManager class with all required fields. Logger/BrainConfig interfaces exported.
+- [x] **T4. Create `src/brain-connection.test.ts`** — 16 Jest tests (14 from reference + 2). Used `jest.mock('net', factory)` pattern to work around Node.js non-configurable property issue (neither direct assignment nor jest.spyOn work on Node.js module exports).
+- [x] **T5. Update `src/extension.ts`** — Integration complete: startServer returns Promise<number>, activate creates BrainConnectionManager after server starts, destroy called in dispose/deactivate, handleBrainMessage stub added.
+- [x] **T6. Compile** — `npm run compile` passes with zero errors
+- [x] **T7. Run tests** — All 16 Jest tests pass
 
 ## Acceptance-Driven Tests
 

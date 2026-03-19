@@ -1,7 +1,7 @@
 ---
 id=021-Write-test-fast-command
 title=Issue 021: Write test_fast_command.py (Tier 1)
-state=BUILT
+state=COMPLETE
 parent=
 children=046,047,048,049,050,051,052,053,054,055,056,057
 split_count=0
@@ -820,6 +820,16 @@ pytest cyrus2/tests/test_fast_command.py -k "switch or rename" -v
 - **Context used:** 34%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build
+
+### COMPLETE — 2026-03-19 18:44:54Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
 ## Interview Q&A
 
 1. **Q:** The issue spec describes _fast_command() returning simple command dicts like {"command": "pause"}, but the actual implementation returns {"action": "command", "spoken": "", "message": "", "command": {"type": "pause"}}. Should tests match the current implementation or the spec?

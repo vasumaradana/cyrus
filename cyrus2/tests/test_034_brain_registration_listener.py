@@ -756,10 +756,20 @@ class TestRegistrationServerHeadlessOnly(unittest.IsolatedAsyncioTestCase):
         session_mgr = MagicMock()
         loop = asyncio.get_event_loop()
 
+        mock_health_runner = AsyncMock()
+
         with (
             patch.object(cyrus_brain, "HEADLESS", True),
             patch("asyncio.start_server", side_effect=mock_start_server),
             patch.object(cyrus_brain.websockets, "serve", mock_ws_serve),
+            # Prevent _start_health_server from binding a real port 8771 so
+            # this test remains isolated and doesn't conflict with subsequent
+            # tests that also call _init_servers().
+            patch.object(
+                cyrus_brain,
+                "_start_health_server",
+                return_value=mock_health_runner,
+            ),
         ):
             await cyrus_brain._init_servers("0.0.0.0", 8766, session_mgr, loop)
 
@@ -790,10 +800,19 @@ class TestRegistrationServerHeadlessOnly(unittest.IsolatedAsyncioTestCase):
         session_mgr = MagicMock()
         loop = asyncio.get_event_loop()
 
+        mock_health_runner = AsyncMock()
+
         with (
             patch.object(cyrus_brain, "HEADLESS", False),
             patch("asyncio.start_server", side_effect=mock_start_server),
             patch.object(cyrus_brain.websockets, "serve", mock_ws_serve),
+            # Prevent _start_health_server from binding a real port 8771 so
+            # this test remains isolated and does not conflict with other tests.
+            patch.object(
+                cyrus_brain,
+                "_start_health_server",
+                return_value=mock_health_runner,
+            ),
         ):
             await cyrus_brain._init_servers("0.0.0.0", 8766, session_mgr, loop)
 

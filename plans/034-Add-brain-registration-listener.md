@@ -59,10 +59,10 @@
 
 ## Prioritized Tasks
 
-- [ ] **1. Import COMPANION_PORT** — Add `COMPANION_PORT` to the `cyrus_config` import block in `cyrus_brain.py`
-- [ ] **2. Add SessionInfo dataclass** — Define `SessionInfo` with fields: `workspace: str`, `safe: str`, `port: int`, `connection: asyncio.StreamWriter`, `created_at: float` (default `time.time()`)
-- [ ] **3. Add module-level state** — `_registered_sessions: dict[str, SessionInfo] = {}` and `_sessions_lock = threading.Lock()` in cyrus_brain.py shared state section
-- [ ] **4. Implement `_handle_registration_client()`** — Async handler for registration connections:
+- [x] **1. Import COMPANION_PORT** — Add `COMPANION_PORT` to the `cyrus_config` import block in `cyrus_brain.py`
+- [x] **2. Add SessionInfo dataclass** — Define `SessionInfo` with fields: `workspace: str`, `safe: str`, `port: int`, `connection: asyncio.StreamWriter`, `created_at: float` (default `time.time()`)
+- [x] **3. Add module-level state** — `_registered_sessions: dict[str, SessionInfo] = {}` and `_sessions_lock = threading.Lock()` in cyrus_brain.py shared state section
+- [x] **4. Implement `_handle_registration_client()`** — Async handler for registration connections:
   - Read line-delimited JSON in a loop
   - On `register`: create SessionInfo, store in `_registered_sessions`, also update `cyrus_common._registered_sessions[workspace] = f"{workspace} - Visual Studio Code"` for compat
   - On `focus`: set `_active_project` with lock
@@ -70,7 +70,7 @@
   - On `permission_respond`: log and route to PermissionWatcher (TODO stub for now, per issue)
   - On `prompt_respond`: log and route to waiting code (TODO stub for now, per issue)
   - On disconnect (EOF or exception): remove from both dicts, log
-- [ ] **5. Add registration server to `_init_servers()`** — Conditionally start when `HEADLESS=True`:
+- [x] **5. Add registration server to `_init_servers()`** — Conditionally start when `HEADLESS=True`:
   ```python
   if HEADLESS:
       reg_server = await asyncio.start_server(
@@ -79,8 +79,8 @@
       log.info("Listening for companion registrations on %s:%s", host, COMPANION_PORT)
   ```
   Return it as part of the tuple (or None if not HEADLESS)
-- [ ] **6. Wire into `main()` asyncio.gather()** — Add `reg_server.serve_forever()` to the gather when HEADLESS
-- [ ] **7. Write tests** — `cyrus2/tests/test_034_brain_registration_listener.py`:
+- [x] **6. Wire into `main()` asyncio.gather()** — Add `reg_server.serve_forever()` to the gather when HEADLESS (via contextlib.AsyncExitStack)
+- [x] **7. Write tests** — `cyrus2/tests/test_034_brain_registration_listener.py`:
   - Test SessionInfo dataclass creation
   - Test register message adds to both dicts
   - Test focus message updates _active_project
@@ -91,7 +91,7 @@
   - Test malformed JSON is skipped gracefully
   - Test permission_respond and prompt_respond are logged
   - Test server only starts in HEADLESS mode
-- [ ] **8. Lint & validate** — Run `ruff check` and `pytest`
+- [x] **8. Lint & validate** — Run `ruff check` and `pytest`
 
 ## Acceptance-Driven Tests
 

@@ -17,6 +17,16 @@
           "type": "string",
           "default": "",
           "description": "VS Code command ID to focus Claude Code's chat panel. Leave blank for auto-detection. To find the right command: open Command Palette (Ctrl+Shift+P) and search for 'Claude' to see available commands."
+        },
+        "cyrusCompanion.brainHost": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Hostname/IP of Cyrus Brain (for registration and receiving responses)"
+        },
+        "cyrusCompanion.brainPort": {
+          "type": "integer",
+          "default": 8770,
+          "description": "Port Cyrus Brain listens on for extension registration (8770)"
         }
       }
     }
@@ -24,11 +34,21 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/src"],
+    "testMatch": ["**/*.test.ts"]
   },
   "devDependencies": {
+    "@types/jest": "^29.0.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
     "typescript": "^5.3.0"
   }
 }

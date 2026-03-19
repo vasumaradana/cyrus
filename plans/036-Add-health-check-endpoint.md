@@ -70,17 +70,20 @@ Non-`/health` paths return 404. Logs are suppressed to avoid noise.
 
 ## Prioritized Tasks
 
-- [ ] 1. Add `HEALTH_PORT` constant to `cyrus2/cyrus_config.py`
-- [ ] 2. Add `CYRUS_HEALTH_PORT` entry to `cyrus2/.env.example`
-- [ ] 3. Add `aiohttp` to `cyrus2/requirements-brain.txt`
-- [ ] 4. Write acceptance-driven tests `cyrus2/tests/test_036_health_check.py` (TDD — tests first)
-- [ ] 5. Implement `HealthHandler` / health server in `cyrus2/cyrus_brain.py`:
-  - Create `_start_health_server()` async function using aiohttp
+- [x] 1. Add `HEALTH_PORT` constant to `cyrus2/cyrus_config.py`
+- [x] 2. Add `CYRUS_HEALTH_PORT` entry to `cyrus2/.env.example`
+- [x] 3. Add `aiohttp==3.13.3` to `cyrus2/requirements-brain.txt`
+- [x] 4. Write acceptance-driven tests `cyrus2/tests/test_036_health_check.py` (TDD — tests first)
+- [x] 5. Implement `HealthHandler` / health server in `cyrus2/cyrus_brain.py`:
+  - Created `_start_health_server()` async function using aiohttp
   - `GET /health` → 200 JSON with status, timestamp, sessions, active_project, headless
-  - All other paths → 404
-  - Suppress access logs
-- [ ] 6. Integrate health server into `_init_servers()` and `main()` asyncio.gather()
-- [ ] 7. Run tests, lint, format — ensure all pass
+  - All other paths → 404 (aiohttp default behaviour)
+  - Suppress access logs via `access_log=None` on AppRunner
+- [x] 6. Integrate health server into `_init_servers()` and `main()` asyncio.gather()
+  - `_start_health_server()` called at end of `_init_servers()`; runner returned as 5th tuple element
+  - Cleanup registered via `stack.push_async_callback(health_runner.cleanup)` in main()
+- [x] 7. Run tests, lint, format — all 18 tests in test_036 pass, lint clean, format clean
+- [x] 8. Fix port conflict: `test_034_brain_registration_listener.py` two tests calling `_init_servers()` left port 8771 bound between tests; patched `_start_health_server` in both test contexts. Full suite: 846 passed, 0 failed
 
 ## Acceptance-Driven Tests
 

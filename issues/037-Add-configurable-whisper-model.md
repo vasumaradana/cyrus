@@ -1,18 +1,18 @@
 ---
 id=037-Add-configurable-whisper-model
 title=Issue 037: Add Configurable Whisper Model
-state=GROOMED
+state=COMPLETE
 parent=
 children=
 split_count=0
 force_split=false
 needs_interview=false
 verify_count=0
-total_input_tokens=220797
-total_output_tokens=53
-total_duration_seconds=795
-total_iterations=77
-run_count=77
+total_input_tokens=387220
+total_output_tokens=135
+total_duration_seconds=1298
+total_iterations=83
+run_count=82
 ---
 
 # Issue 037: Add Configurable Whisper Model
@@ -860,5 +860,68 @@ Make Whisper speech-to-text model selection configurable via `CYRUS_WHISPER_MODE
 - **Input tokens:** 0 (final context: 0)
 - **Output tokens:** 0
 - **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### GROOMED — 2026-03-18 20:42:06Z
+
+- **From:** GROOMED
+- **Duration in stage:** 144s
+- **Input tokens:** 38,966 (final context: 38,966)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 19%
+- **Model:** claude-opus-4-6
+- **Trigger:** auto/plan
+
+### GROOMED — 2026-03-18 21:04:47Z
+
+- **From:** GROOMED
+- **Duration in stage:** 110s
+- **Input tokens:** 34,364 (final context: 34,364)
+- **Output tokens:** 25
+- **Iterations:** 1
+- **Context used:** 17%
+- **Model:** claude-opus-4-6
+- **Trigger:** manual/plan
+
+### PLANNED — 2026-03-19 00:41:39Z
+
+- **From:** PLANNED
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### PLANNED — 2026-03-19 00:42:33Z
+
+- **From:** PLANNED
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 1
+- **Model:** claude-sonnet-4-6
+- **Trigger:** auto/build
+
+### COMPLETE — 2026-03-19 01:13:49Z
+
+- **From:** BUILT
+- **Duration in stage:** 0s
+- **Input tokens:** 0 (final context: 0)
+- **Output tokens:** 0
+- **Iterations:** 0
+- **Model:** 
+- **Trigger:** auto/verify
+
+### COMPLETE — 2026-03-19 01:13:49Z
+
+- **From:** COMPLETE
+- **Duration in stage:** 249s
+- **Input tokens:** 93,093 (final context: 34,800)
+- **Output tokens:** 32
+- **Iterations:** 2
+- **Context used:** 17%
 - **Model:** claude-sonnet-4-6
 - **Trigger:** auto/build

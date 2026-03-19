@@ -10,7 +10,7 @@ MAX_AUTO_SPLITS=3
 MAX_ITERATIONS=2
 MAX_VERIFY_RETRIES=3
 CLAUDE_TIMEOUT=3600
-FIX_COMMANDS=
+FIX_COMMANDS=uv run --project cyrus2 ruff format cyrus2/
 AUDIT_MODEL=gpt-4o
 TRIAGE_MODEL=claude-haiku-4-5-20251001
 SPLIT_MODEL=claude-sonnet-4-6
@@ -26,12 +26,12 @@ DISABLE_LOG_STREAM=false
 BARF_DIR=.barf
 PROMPT_DIR=prompts
 LOG_FILE=.barf/barf.jsonl
-LOG_LEVEL=trace
+LOG_LEVEL=debug
 LOG_PRETTY=true
 
-BUILD_COMMAND=cyrus2/.venv/bin/python -m ruff check cyrus2/
-CHECK_COMMAND=cyrus2/.venv/bin/python -m ruff format --check cyrus2/
-TEST_COMMAND=cyrus2/.venv/bin/python -m pytest cyrus2/tests/
+BUILD_COMMAND=uv run --project cyrus2 ruff check cyrus2/
+CHECK_COMMAND=uv run --project cyrus2 ruff format --check cyrus2/
+TEST_COMMAND=uv run --project cyrus2 pytest cyrus2/tests/
 
 SENTRY_DSN=https://fb270d753847029787e0494c6fdc9af2@o4506185205678080.ingest.us.sentry.io/4511037813620736
 SENTRY_ENVIRONMENT=dev

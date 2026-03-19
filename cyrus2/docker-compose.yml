@@ -1,0 +1,32 @@
+# Quick start:
+#   cp .env.example .env        # configure your auth token
+#   docker compose up -d        # start the brain in the background
+#   docker compose logs -f      # stream logs
+#   docker compose down         # stop and remove the container
+
+services:
+  brain:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cyrus-brain
+    restart: unless-stopped
+    ports:
+      - "8766:8766"   # brain control channel
+      - "8767:8767"   # hook event channel
+      - "8769:8769"   # mobile client channel
+      - "8770:8770"   # extension registration channel
+    environment:
+      CYRUS_HEADLESS: "1"
+      CYRUS_AUTH_TOKEN: "${CYRUS_AUTH_TOKEN:-}"
+      CYRUS_BRAIN_HOST: "0.0.0.0"
+    volumes:
+      - ./.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

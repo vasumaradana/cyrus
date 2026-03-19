@@ -50,17 +50,17 @@
 
 ## Prioritized Tasks
 
-- [ ] **1. Add `send()` method to BrainConnectionManager** — Add `send(msg: object): boolean` that JSON-serializes and writes to socket if connected, returns false otherwise. This is needed before focus tracking can send messages. _(Skip if Issue 031 already provides this method.)_
-- [ ] **2. Add focus tracking listener in `activate()`** — Register `vscode.window.onDidChangeWindowState` listener that:
+- [x] **1. Add `send()` method to BrainConnectionManager** — Add `send(msg: object): boolean` that JSON-serializes and writes to socket if connected, returns false otherwise. This is needed before focus tracking can send messages. _(Skip if Issue 031 already provides this method.)_
+- [x] **2. Add focus tracking listener in `activate()`** — Register `vscode.window.onDidChangeWindowState` listener that:
   - Checks if `brainManager` exists
   - Applies 100ms debounce via `lastFocusTime` timestamp
   - Constructs `{type: "focus"|"blur", workspace: "...", timestamp: ...}` message
   - Calls `brainManager.send(msg)`
   - Logs to output channel: `[Brain] Sent: focus` or `[Brain] Sent: blur`
   - Wraps in try/catch for resilience
-- [ ] **3. Register listener in context.subscriptions** — Push the disposable returned by `onDidChangeWindowState` to `context.subscriptions`
-- [ ] **4. Write unit tests for focus tracking** — Test debounce, message format, null-connection guard, logging
-- [ ] **5. Compile and verify** — `npm run compile` must pass clean
+- [x] **3. Register listener in context.subscriptions** — Push the disposable returned by `onDidChangeWindowState` to `context.subscriptions`
+- [x] **4. Write unit tests for focus tracking** — Test debounce, message format, null-connection guard, logging
+- [x] **5. Compile and verify** — `npm run compile` must pass clean
 
 ## Acceptance-Driven Tests
 
@@ -84,10 +84,12 @@
 
 ## Files to Create/Modify
 
-- **Modify**: `cyrus-companion/src/extension.ts` — add focus tracking listener in `activate()`, debounce logic, subscription registration
-- **Modify**: `cyrus-companion/src/brain-connection.ts` — add `send(msg: object): boolean` method _(only if 031 source exists; otherwise create this file from compiled reference)_
-- **Create**: `cyrus-companion/src/focus-tracking.test.ts` — unit tests for focus tracking behavior (following patterns from `out/brain-connection.test.js`)
-- **Modify**: `cyrus-companion/package.json` — add Jest devDependencies and test script _(only if not already added by Issue 031)_
+- **Modify**: `cyrus-companion/src/extension.ts` — added focus tracking listener in `activate()`, subscription registration via `createFocusHandler` ✅
+- **Modify**: `cyrus-companion/src/brain-connection.ts` — added `send(msg: object): boolean` method ✅
+- **Create**: `cyrus-companion/src/focus-tracker.ts` — extracted `createFocusHandler` factory (not in original plan; extracted for testability, follows brain-connection.ts pattern) ✅
+- **Create**: `cyrus-companion/src/focus-tracking.test.ts` — 20 unit tests covering all acceptance criteria ✅
+- **Modify**: `cyrus-companion/src/__mocks__/vscode.ts` — added `onDidChangeWindowState` mock to window ✅
+- `cyrus-companion/package.json` — already had Jest configured from Issue 031 ✅
 
 ## Key Implementation Details
 
