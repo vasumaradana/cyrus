@@ -27,6 +27,11 @@
           "type": "integer",
           "default": 8770,
           "description": "Port Cyrus Brain listens on for extension registration (8770)"
+        },
+        "cyrusCompanion.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Shared auth token (CYRUS_AUTH_TOKEN). Must match the brain's token. If empty, falls back to CYRUS_AUTH_TOKEN env var."
         }
       }
     }

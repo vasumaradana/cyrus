@@ -69,8 +69,8 @@ function makeLogger() {
 
 // ── Config helper ─────────────────────────────────────────────────────────────
 
-function makeConfigGetter(host = 'localhost', port = 8770) {
-    return () => ({ brainHost: host, brainPort: port });
+function makeConfigGetter(host = 'localhost', port = 8770, token = 'test-token') {
+    return () => ({ brainHost: host, brainPort: port, authToken: token });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -459,7 +459,7 @@ describe('BrainConnectionManager', () => {
             // getConfig returns defaults
             const mgr = new BrainConnectionManager(
                 'ws', 'ws', 8768, logger,
-                () => ({ brainHost: 'localhost', brainPort: 8770 }),
+                () => ({ brainHost: 'localhost', brainPort: 8770, authToken: 'test-token' }),
             );
             mgr.connect();
 

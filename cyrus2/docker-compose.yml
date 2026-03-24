@@ -16,6 +16,7 @@ services:
       - "8767:8767"   # hook event channel
       - "8769:8769"   # mobile client channel
       - "8770:8770"   # extension registration channel
+      - "8771:8771"   # health check endpoint
     environment:
       CYRUS_HEADLESS: "1"
       CYRUS_AUTH_TOKEN: "${CYRUS_AUTH_TOKEN:-}"
@@ -23,7 +24,7 @@ services:
     volumes:
       - ./.env:/app/.env:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8771/health')"]
       interval: 30s
       timeout: 5s
       start_period: 10s

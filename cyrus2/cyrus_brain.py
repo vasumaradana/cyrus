@@ -691,10 +691,19 @@ def _open_companion_connection(safe: str) -> socket.socket:
 def _submit_via_extension(text: str) -> bool:
     """
     Submit via the Cyrus Companion VS Code extension.
+
+    In HEADLESS mode: sends a submit message over the persistent registration
+    connection (port 8770) — the companion is remote, so local sockets don't exist.
+
+    Otherwise:
     Windows: TCP localhost + discovery file (no AF_UNIX needed).
     Unix/Mac: AF_UNIX domain socket.
+
     Returns True on {"ok": true}, False on any failure (falls back to UIA).
     """
+    if HEADLESS:
+        return _submit_via_registered_connection(text)
+
     with _active_project_lock:
         proj = _active_project
 
@@ -724,6 +733,40 @@ def _submit_via_extension(text: str) -> bool:
         return False
     except Exception as e:
         log.error("Companion extension error: %s", e, exc_info=True)
+        return False
+
+
+def _submit_via_registered_connection(text: str) -> bool:
+    """Submit text via the registered companion's persistent TCP connection.
+
+    Used in HEADLESS mode where the companion is remote and local sockets
+    are not available.  Sends a 'submit' message over the registration
+    connection and waits for the companion to acknowledge.
+    """
+    with _active_project_lock:
+        proj = _active_project
+
+    # Find a registered session — prefer active project, fall back to any
+    with _sessions_lock:
+        session = _registered_sessions.get(proj)
+        if not session and _registered_sessions:
+            session = next(iter(_registered_sessions.values()))
+
+    if not session:
+        log.warning("No registered companion extension sessions")
+        return False
+
+    try:
+        writer = session.connection
+        msg = json.dumps({"type": "submit", "text": text}) + "\n"
+        writer.write(msg.encode("utf-8"))
+        log.info(
+            "Submitted text via registered connection (workspace=%s)",
+            session.workspace,
+        )
+        return True
+    except Exception as e:
+        log.error("Submit via registered connection failed: %s", e, exc_info=True)
         return False
 
 

@@ -22,9 +22,9 @@ COPY cyrus_common.py cyrus_log.py ./
 #   8767 — hook event channel
 #   8769 — mobile client channel
 #   8770 — extension registration channel
-EXPOSE 8766 8767 8769 8770
+EXPOSE 8766 8767 8769 8770 8771
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8771/health')"
 
 CMD ["python", "cyrus_brain.py"]

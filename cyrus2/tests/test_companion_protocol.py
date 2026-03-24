@@ -180,6 +180,9 @@ class TestMessageDecoding:
             patch("cyrus_brain._open_companion_connection", return_value=mock_socket),
             patch("cyrus_brain._active_project", "default"),
             patch("cyrus_brain._active_project_lock"),
+            # Force non-headless path regardless of test execution order; test_030
+            # reloads cyrus_brain with HEADLESS=True which can leak between tests.
+            patch("cyrus_brain.HEADLESS", False),
         ):
             result = _submit_via_extension("type something")
 
@@ -211,6 +214,9 @@ class TestSocketCommunication:
             patch("cyrus_brain._open_companion_connection", return_value=mock_socket),
             patch("cyrus_brain._active_project", "default"),
             patch("cyrus_brain._active_project_lock"),
+            # Force non-headless path regardless of test execution order; test_030
+            # reloads cyrus_brain with HEADLESS=True which can leak between tests.
+            patch("cyrus_brain.HEADLESS", False),
         ):
             _submit_via_extension(text)
 
@@ -234,6 +240,9 @@ class TestSocketCommunication:
             patch("cyrus_brain._open_companion_connection", return_value=mock_socket),
             patch("cyrus_brain._active_project", "myproject"),
             patch("cyrus_brain._active_project_lock"),
+            # Force non-headless path regardless of test execution order; test_030
+            # reloads cyrus_brain with HEADLESS=True which can leak between tests.
+            patch("cyrus_brain.HEADLESS", False),
         ):
             result = _submit_via_extension("hello")
 

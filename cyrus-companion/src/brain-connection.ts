@@ -28,6 +28,7 @@ export interface Logger {
 export interface BrainConfig {
     brainHost: string;
     brainPort: number;
+    authToken: string;
 }
 
 // ── BrainConnectionManager ────────────────────────────────────────────────────
@@ -155,11 +156,14 @@ export class BrainConnectionManager {
         this.reconnectBackoffMs = INITIAL_BACKOFF_MS;
 
         // Send workspace registration so the brain can route future messages back.
+        // Token is read fresh from config on each connect so settings changes take effect.
+        const { authToken } = this.getConfig();
         const regMsg = {
             type: 'register',
             workspace: this.workspace,
             safe: this.safe,
             port: this.listenPort,
+            token: authToken,
         };
         this.socket!.write(JSON.stringify(regMsg) + '\n');
         this.logger.appendLine(`[Brain] Registered: ${this.workspace} (port ${this.listenPort})`);
