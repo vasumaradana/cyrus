@@ -33,6 +33,7 @@ import json
 import argparse
 import asyncio
 import time
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
@@ -50,6 +51,8 @@ from faster_whisper import WhisperModel
 from dotenv import load_dotenv
 
 load_dotenv()
+
+log = logging.getLogger(__name__)
 
 # ── GPU detection (runs at import time) ───────────────────────────────────────
 
@@ -198,7 +201,7 @@ def _start_active_tracker(session_mgr, tts_queue, loop):
                     print(f"[Cyrus] Active project: {proj}")
                     session_mgr.on_session_switch(proj, tts_queue, loop)
         except Exception:
-            pass
+            log.debug("Active window tracker poll failed", exc_info=True)
         time.sleep(0.5)
 
 
@@ -215,7 +218,7 @@ def play_chime():
         sound = pygame.sndarray.make_sound(stereo)
         sound.play()
     except Exception:
-        pass
+        log.debug("Chime playback failed", exc_info=True)
 
 
 def play_listen_chime():
@@ -235,7 +238,7 @@ def play_listen_chime():
         stereo = np.column_stack([wave, wave])
         pygame.sndarray.make_sound(stereo).play()
     except Exception:
-        pass
+        log.debug("Listen chime playback failed", exc_info=True)
 
 
 # ── TTS queue helpers ─────────────────────────────────────────────────────────
@@ -247,6 +250,7 @@ async def drain_tts_queue() -> None:
         try:
             _tts_queue.get_nowait()
         except Exception:
+            log.debug("TTS queue drain interrupted", exc_info=True)
             break
 
 
@@ -261,8 +265,8 @@ async def tts_worker(session_mgr) -> None:
             print(f"[TTS worker] speak: {text[:50]!r}")
             await speak(text)
             print("[TTS worker] done")
-        except Exception as e:
-            print(f"[TTS worker error] {e}")
+        except Exception:
+            log.warning("TTS speak failed", exc_info=True)
 
 
 async def _speak_urgent(text: str) -> None:
@@ -313,8 +317,8 @@ async def _remote_route(text: str, project: str, last_response: str) -> dict:
         # Strip the envelope "type" key before returning as a decision dict
         data.pop("type", None)
         return data
-    except Exception as e:
-        print(f"[Cyrus] Remote brain unreachable ({e}) — routing locally.")
+    except Exception:
+        log.error("Remote brain unreachable", exc_info=True)
         _remote_ws = None
         return None
 
@@ -394,7 +398,7 @@ def _execute_cyrus_command(ctype: str, cmd: dict, spoken: str,
         with _project_locked_lock:
             _project_locked = False
         spoken = spoken or "Following window focus."
-        print(f"[Cyrus] Routing unlocked.")
+        print("[Cyrus] Routing unlocked.")
 
     elif ctype == "which_project":
         with _active_project_lock:
@@ -491,7 +495,7 @@ class ChatWatcher:
                     tts_queue.put((self.project_name, text)), loop
                 )
             except Exception:
-                pass
+                log.debug("Failed to queue TTS item", exc_info=True)
         return len(items)
 
     # ── Find the webview ──────────────────────────────────────────────────────
@@ -514,14 +518,14 @@ class ChatWatcher:
                 if ctrl.ControlTypeName == "DocumentControl":
                     docs.append((d, ctrl))
             except Exception:
-                pass
+                log.debug("UIA DocumentControl check failed", exc_info=True)
             try:
                 child = ctrl.GetFirstChildControl()
                 while child:
                     collect(child, d + 1)
                     child = child.GetNextSiblingControl()
             except Exception:
-                pass
+                log.debug("UIA sibling walk failed", exc_info=True)
 
         collect(chrome)
         unnamed = [(d, c) for d, c in docs if not (c.Name or "").strip()]
@@ -542,14 +546,14 @@ class ChatWatcher:
             if len(name) >= 4:
                 out.append((depth, ctype, name))
         except Exception:
-            pass
+            log.debug("UIA control name/type read failed", exc_info=True)
         try:
             child = ctrl.GetFirstChildControl()
             while child:
                 self._walk(child, depth + 1, max_depth, out)
                 child = child.GetNextSiblingControl()
         except Exception:
-            pass
+            log.debug("UIA sibling walk failed", exc_info=True)
         return out
 
     # ── Extract latest Claude response ────────────────────────────────────────
@@ -611,7 +615,8 @@ class ChatWatcher:
     def start(self, tts_queue, loop: asyncio.AbstractEventLoop,
               is_active_fn=None):
         if is_active_fn is None:
-            is_active_fn = lambda: True
+            def is_active_fn() -> bool:
+                return True
 
         def poll():
             while self._chat_doc is None:
@@ -628,6 +633,7 @@ class ChatWatcher:
                     if seed:
                         break
                 except Exception:
+                    log.debug("Initial seed extraction failed", exc_info=True)
                     seed = ""
                 time.sleep(1.0)
             self._last_spoken = seed
@@ -692,6 +698,7 @@ class ChatWatcher:
                                       f"{len(self._pending_queue)} message(s) waiting")
 
                 except Exception:
+                    log.warning("Chat doc walk failed, reconnecting", exc_info=True)
                     self._chat_doc = None
                     while self._chat_doc is None:
                         self._chat_doc = self._find_webview()
@@ -755,14 +762,14 @@ class PermissionWatcher:
                 if ctrl.ControlTypeName == "DocumentControl":
                     docs.append((d, ctrl))
             except Exception:
-                pass
+                log.debug("UIA DocumentControl check failed", exc_info=True)
             try:
                 child = ctrl.GetFirstChildControl()
                 while child:
                     collect(child, d + 1)
                     child = child.GetNextSiblingControl()
             except Exception:
-                pass
+                log.debug("UIA sibling walk failed", exc_info=True)
 
         collect(chrome)
         unnamed = [(d, c) for d, c in docs if not (c.Name or "").strip()]
@@ -786,14 +793,14 @@ class PermissionWatcher:
                 if name:
                     items.append((d, ctype, name, ctrl))
             except Exception:
-                pass
+                log.debug("UIA control name/type read failed", exc_info=True)
             try:
                 child = ctrl.GetFirstChildControl()
                 while child:
                     walk(child, d + 1)
                     child = child.GetNextSiblingControl()
             except Exception:
-                pass
+                log.debug("UIA sibling walk failed", exc_info=True)
 
         walk(self._chat_doc)
 
@@ -857,7 +864,7 @@ class PermissionWatcher:
             try:
                 self._allow_btn.Click()
             except Exception:
-                pass
+                log.warning("Permission allow-button click failed", exc_info=True)
             self._pending   = False
             self._allow_btn = None
             return True
@@ -869,7 +876,7 @@ class PermissionWatcher:
                 try:
                     vscode.SetFocus()
                 except Exception:
-                    pass
+                    log.debug("VS Code focus failed after deny", exc_info=True)
             pyautogui.press("escape")
             self._pending   = False
             self._allow_btn = None
@@ -896,8 +903,8 @@ class PermissionWatcher:
                 time.sleep(0.05)
                 pyautogui.press("enter")
                 print(f"[Cyrus] → Prompt answered: {text!r} ({self.project_name or 'session'})")
-            except Exception as e:
-                print(f"[Cyrus] Prompt input error: {e}")
+            except Exception:
+                log.warning("Prompt input failed", exc_info=True)
 
         self._prompt_pending    = False
         self._prompt_input_ctrl = None
@@ -953,6 +960,7 @@ class PermissionWatcher:
                             self._prompt_input_ctrl = None
 
                 except Exception:
+                    log.warning("Permission scan failed, reconnecting", exc_info=True)
                     self._chat_doc = None
                     while self._chat_doc is None:
                         self._chat_doc = self._find_webview()
@@ -1031,19 +1039,19 @@ class SessionManager:
                         if proj not in self._chat_watchers:
                             self._add_session(proj, subname, tts_queue, loop)
                 except Exception:
-                    pass
+                    log.debug("Recurring session scan failed", exc_info=True)
                 time.sleep(5)
 
         try:
             for proj, subname in _vs_code_windows():
                 self._add_session(proj, subname, tts_queue, loop)
         except Exception:
-            pass
+            log.error("Initial session scan failed", exc_info=True)
 
         if self.multi_session:
             names = " | ".join(f'"{a}"' for a in self._aliases)
             print(f'[Cyrus] {len(self._chat_watchers)} sessions: {names}')
-            print(f'[Cyrus] Say "Cyrus, switch to [name]" to lock routing.')
+            print('[Cyrus] Say "Cyrus, switch to [name]" to lock routing.')
 
         threading.Thread(target=scan, daemon=True).start()
 
@@ -1080,6 +1088,7 @@ def vad_loop(on_utterance, loop: asyncio.AbstractEventLoop):
                     prob = model(torch.from_numpy(chunk), SAMPLE_RATE).item()
                 is_speech = prob > SPEECH_THRESHOLD
             except Exception:
+                log.debug("VAD frame processing failed", exc_info=True)
                 continue
 
             if not recording:
@@ -1200,14 +1209,14 @@ def _find_chat_input(target_subname: str = "") -> object:
             if ctrl.ControlTypeName == "EditControl":
                 found.append((d, ctrl))
         except Exception:
-            pass
+            log.debug("UIA EditControl check failed", exc_info=True)
         try:
             child = ctrl.GetFirstChildControl()
             while child:
                 _walk(child, d + 1)
                 child = child.GetNextSiblingControl()
         except Exception:
-            pass
+            log.debug("UIA sibling walk failed", exc_info=True)
 
     _walk(chrome)
 
@@ -1236,6 +1245,7 @@ def submit_to_vscode(text: str) -> bool:
             if VSCODE_TITLE not in (win.title or ""):
                 raise ValueError("wrong window")
         except Exception:
+            log.debug("Cached window handle stale", exc_info=True)
             win = None
             _vscode_win_cache.pop(proj, None)
 
@@ -1255,7 +1265,7 @@ def submit_to_vscode(text: str) -> bool:
         win.activate()
         time.sleep(0.15)   # give VS Code time to foreground and update UIA tree
     except Exception:
-        pass
+        log.warning("VS Code window activation failed", exc_info=True)
 
     # ── Use cached chat input — no Exists() check, just try it ────────────────
     cached = _chat_input_cache.get(proj)
@@ -1266,6 +1276,7 @@ def submit_to_vscode(text: str) -> bool:
             cached.Click()
             time.sleep(0.03)
         except Exception:
+            log.debug("Cached chat input click failed", exc_info=True)
             # Stale handle — fall through to fresh search
             cached = None
             _chat_input_cache.pop(proj, None)
@@ -1282,15 +1293,15 @@ def submit_to_vscode(text: str) -> bool:
             cached.Click()
             time.sleep(0.03)
         except Exception:
+            log.error("Chat input click failed", exc_info=True)
             _chat_input_cache.pop(proj, None)
-            print("[!] Could not click Claude chat input — skipping.")
             return False
 
     saved = ""
     try:
         saved = pyperclip.paste()
     except Exception:
-        pass
+        log.debug("Clipboard save failed", exc_info=True)
 
     pyperclip.copy(text)
     pyautogui.hotkey("ctrl", "v")
@@ -1301,7 +1312,7 @@ def submit_to_vscode(text: str) -> bool:
     try:
         pyperclip.copy(saved)
     except Exception:
-        pass
+        log.debug("Clipboard restore failed", exc_info=True)
 
     return True
 
@@ -1373,7 +1384,9 @@ async def _speak_kokoro(text: str) -> None:
 
 async def _speak_edge(text: str) -> None:
     """Edge TTS fallback — requires network + ffmpeg. Used when Kokoro is not loaded."""
-    import subprocess, tempfile, edge_tts
+    import subprocess
+    import tempfile
+    import edge_tts
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
         tmp_path = f.name
     try:
@@ -1450,8 +1463,8 @@ async def main() -> None:
             import websockets as _ws_lib
             _remote_ws = await _ws_lib.connect(_remote_url)
             print(f"[Cyrus] Connected to remote brain at {_remote_url}")
-        except Exception as e:
-            print(f"[Cyrus] Could not connect to remote brain ({e}) — using local routing.")
+        except Exception:
+            log.warning("Remote brain connection failed, using local routing", exc_info=True)
             _remote_url = ""
 
     if _CUDA:
@@ -1479,8 +1492,8 @@ async def main() -> None:
             _active_providers = _session.get_providers()
             _tts_device = "GPU" if "CUDAExecutionProvider" in _active_providers else "CPU"
             print(f"[Cyrus] Kokoro TTS loaded ({_tts_device}) — voice: {TTS_VOICE}")
-        except Exception as e:
-            print(f"[Cyrus] Kokoro load failed ({e}) — using Edge TTS fallback")
+        except Exception:
+            log.warning("Kokoro TTS load failed, using Edge TTS fallback", exc_info=True)
     else:
         print("[Cyrus] Kokoro model files not found — using Edge TTS fallback")
         print(f"         Expected: {KOKORO_MODEL}")
@@ -1541,6 +1554,7 @@ async def main() -> None:
         try:
             text = pyperclip.paste().strip()
         except Exception:
+            log.debug("Clipboard read failed", exc_info=True)
             text = ""
         if text:
             asyncio.run_coroutine_threadsafe(_tts_queue.put(("", text)), loop)
@@ -1551,7 +1565,7 @@ async def main() -> None:
     keyboard.add_hotkey(KEY_STOP,      stop_speech)
     keyboard.add_hotkey(KEY_READ_CLIP, read_clipboard)
 
-    print(f"[Cyrus] F9 pause  |  F7 stop+clear  |  F8 clipboard  |  Ctrl+C exit")
+    print("[Cyrus] F9 pause  |  F7 stop+clear  |  F8 clipboard  |  Ctrl+C exit")
 
     # Interactive startup — verify, greet, detect sessions, assign names
     await startup_sequence(session_mgr)
@@ -1739,17 +1753,17 @@ if __name__ == "__main__":
             pygame.mixer.stop()   # stop all playing sounds before tearing down SDL
             pygame.mixer.quit()
         except Exception:
-            pass
+            log.debug("Pygame mixer cleanup failed", exc_info=True)
         try:
             sd.stop()             # abort all PortAudio streams
         except Exception:
-            pass
+            log.debug("Sounddevice cleanup failed", exc_info=True)
         if _whisper_executor is not None:
             _whisper_executor.shutdown(wait=False, cancel_futures=True)
         try:
             keyboard.unhook_all()
         except Exception:
-            pass
+            log.debug("Keyboard unhook failed", exc_info=True)
         # Force-exit: bypasses Python's C-extension destructor sequence which
         # crashes on Windows when audio threads (PortAudio/SDL) are still live.
         os._exit(0)

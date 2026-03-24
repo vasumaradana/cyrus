@@ -1,0 +1,7 @@
+comtypes==1.4.16
+pyautogui==0.9.54
+pygetwindow==0.0.9
+pyperclip==1.11.0
+python-dotenv==1.2.2
+uiautomation==2.0.29
+websockets==16.0

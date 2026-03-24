@@ -209,7 +209,9 @@ async def _speak_kokoro(text: str) -> None:
 
 
 async def _speak_edge(text: str) -> None:
-    import subprocess, tempfile, edge_tts
+    import subprocess
+    import tempfile
+    import edge_tts
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
         tmp_path = f.name
     try:

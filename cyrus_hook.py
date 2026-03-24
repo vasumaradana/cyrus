@@ -8,7 +8,6 @@ Never raises — a crashing hook blocks Claude Code.
 """
 
 import json
-import os
 import socket
 import sys
 

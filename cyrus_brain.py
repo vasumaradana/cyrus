@@ -22,6 +22,7 @@ Protocol (line-delimited JSON):
                   {"type": "tts_end"}
 """
 
+import logging
 import os
 import re
 import json
@@ -31,18 +32,29 @@ import time
 import argparse
 import queue as _stdlib_queue
 import socket
+from collections import deque
+from dataclasses import dataclass
 
 import websockets
 import comtypes
 import pyautogui
 import pyperclip
 import pygetwindow as gw
+
+# Logger must be initialized before the uiautomation import guard so that
+# the except blocks below can use it even if the import fails.
+log = logging.getLogger(__name__)
+
 try:
     import uiautomation as auto
 except Exception:
+    log.warning("uiautomation import failed, attempting cache clear", exc_info=True)
     # comtypes cache is likely corrupted — clear it and retry
     try:
-        import comtypes.gen, shutil, os as _os
+        import comtypes.gen
+        import shutil
+        import os as _os
+
         _gen_dir = _os.path.dirname(comtypes.gen.__file__)
         shutil.rmtree(_gen_dir, ignore_errors=True)
         _os.makedirs(_gen_dir, exist_ok=True)
@@ -51,52 +63,74 @@ except Exception:
             _f.write("# auto-generated\n")
         print("[Brain] Cleared corrupted comtypes cache, retrying...")
         import importlib
+
         importlib.invalidate_caches()
         import uiautomation as auto
     except Exception as _e2:
-        print(f"[Brain] FATAL: UIAutomation still unavailable after cache clear ({_e2}).")
+        log.error(
+            "FATAL: UIAutomation still unavailable after cache clear",
+            exc_info=True,
+        )
         print("[Brain] Try: pip install --force-reinstall comtypes uiautomation")
         raise
-from collections import deque
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
-BRAIN_HOST       = "0.0.0.0"
-BRAIN_PORT       = 8766
-HOOK_PORT        = 8767   # Claude Code Stop hook sends here
-MOBILE_PORT      = 8769   # WebSocket endpoint for mobile clients
-VSCODE_TITLE     = "Visual Studio Code"
+BRAIN_HOST = "0.0.0.0"
+BRAIN_PORT = 8766
+HOOK_PORT = 8767  # Claude Code Stop hook sends here
+MOBILE_PORT = 8769  # WebSocket endpoint for mobile clients
+VSCODE_TITLE = "Visual Studio Code"
 _CHAT_INPUT_HINT = "Message input"
 MAX_SPEECH_WORDS = 50
 
-WAKE_WORDS = {"cyrus", "sire", "sirius", "serious", "cyprus",
-              "virus", "sirus", "cirus", "sy", "sir", "sarush", "surus",
-              "saras", "serus", "situs", "cirrus", "serous", "ceres"}
+WAKE_WORDS = {
+    "cyrus",
+    "sire",
+    "sirius",
+    "serious",
+    "cyprus",
+    "virus",
+    "sirus",
+    "cirus",
+    "sy",
+    "sir",
+    "sarush",
+    "surus",
+    "saras",
+    "serus",
+    "situs",
+    "cirrus",
+    "serous",
+    "ceres",
+}
 
-VOICE_HINT = ("\n\n[Voice mode: keep explanations to 2-3 sentences. "
-              "For code changes show only the modified section, not the full file.]")
+VOICE_HINT = (
+    "\n\n[Voice mode: keep explanations to 2-3 sentences. "
+    "For code changes show only the modified section, not the full file.]"
+)
 
 # ── Shared state ───────────────────────────────────────────────────────────────
 
-_active_project:      str            = ""
+_active_project: str = ""
 _active_project_lock: threading.Lock = threading.Lock()
-_chat_input_cache:    dict           = {}   # kept for PermissionWatcher internal use
-_chat_input_coords:   dict           = {}   # proj → (cx, cy) pixel coords, cross-thread safe
-_vscode_win_cache:    dict           = {}
+_chat_input_cache: dict = {}  # kept for PermissionWatcher internal use
+_chat_input_coords: dict = {}  # proj → (cx, cy) pixel coords, cross-thread safe
+_vscode_win_cache: dict = {}
 
-_project_locked:      bool           = False
+_project_locked: bool = False
 _project_locked_lock: threading.Lock = threading.Lock()
 
 _conversation_active: bool = False
-_whisper_prompt:      str  = "Cyrus,"
-_tts_active_remote:   bool = False   # True while voice service is playing TTS
+_whisper_prompt: str = "Cyrus,"
+_tts_active_remote: bool = False  # True while voice service is playing TTS
 
 # asyncio queues — set in main()
-_speak_queue:     asyncio.Queue = None   # (project, text) → sent to voice
-_utterance_queue: asyncio.Queue = None   # utterances received from voice
+_speak_queue: asyncio.Queue = None  # (project, text) → sent to voice
+_utterance_queue: asyncio.Queue = None  # utterances received from voice
 
 # Mobile WebSocket clients
-_mobile_clients: set = set()             # active websocket connections
+_mobile_clients: set = set()  # active websocket connections
 
 # Dedicated submit thread queue — all VS Code UIA writes happen on one thread
 _submit_request_queue: _stdlib_queue.Queue = _stdlib_queue.Queue()
@@ -109,6 +143,7 @@ auto.uiautomation.SetGlobalSearchTimeout(2)
 pyautogui.FAILSAFE = False
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _extract_project(title: str) -> str:
     t = title.replace(" - Visual Studio Code", "").lstrip("● ").strip()
@@ -138,7 +173,7 @@ def _resolve_project(query: str, aliases: dict) -> str | None:
 
 
 def _vs_code_windows() -> list[tuple[str, str]]:
-    seen:   set[str]              = set()
+    seen: set[str] = set()
     result: list[tuple[str, str]] = []
     for w in gw.getAllWindows():
         if VSCODE_TITLE not in (w.title or ""):
@@ -152,16 +187,16 @@ def _vs_code_windows() -> list[tuple[str, str]]:
 
 def _sanitize_for_speech(text: str) -> str:
     """Replace Unicode chars that TTS engines read as garbled UTF-8 bytes."""
-    return (text
-            .replace("\u2014", ", ")   # em dash
-            .replace("\u2013", ", ")   # en dash
-            .replace("\u2026", "...")  # ellipsis
-            .replace("\u2018", "'")    # left single quote
-            .replace("\u2019", "'")    # right single quote
-            .replace("\u201c", '"')    # left double quote
-            .replace("\u201d", '"')    # right double quote
-            .replace("\u2022", ", ")   # bullet
-            )
+    return (
+        text.replace("\u2014", ", ")  # em dash
+        .replace("\u2013", ", ")  # en dash
+        .replace("\u2026", "...")  # ellipsis
+        .replace("\u2018", "'")  # left single quote
+        .replace("\u2019", "'")  # right single quote
+        .replace("\u201c", '"')  # left double quote
+        .replace("\u201d", '"')  # right double quote
+        .replace("\u2022", ", ")  # bullet
+    )
 
 
 def clean_for_speech(text: str) -> str:
@@ -179,7 +214,9 @@ def clean_for_speech(text: str) -> str:
     text = _sanitize_for_speech(text)
     words = text.split()
     if len(words) > MAX_SPEECH_WORDS:
-        text = " ".join(words[:MAX_SPEECH_WORDS]) + ". See the chat for the full response."
+        text = (
+            " ".join(words[:MAX_SPEECH_WORDS]) + ". See the chat for the full response."
+        )
     return text.strip()
 
 
@@ -199,6 +236,7 @@ def _strip_fillers(text: str) -> str:
 
 # ── Send to voice ──────────────────────────────────────────────────────────────
 
+
 async def _send(msg: dict) -> None:
     """Send one JSON message to voice + mobile clients. Fire-and-forget."""
     # Sanitize text fields so TTS engines don't read raw UTF-8 bytes
@@ -213,9 +251,16 @@ async def _send(msg: dict) -> None:
                 _voice_writer.write((json.dumps(msg) + "\n").encode())
                 await _voice_writer.drain()
         except Exception:
+            log.warning("Voice writer send failed", exc_info=True)
             _voice_writer = None
     # Broadcast to mobile WebSocket clients
-    if _mobile_clients and msg.get("type") in ("speak", "prompt", "thinking", "tool", "status"):
+    if _mobile_clients and msg.get("type") in (
+        "speak",
+        "prompt",
+        "thinking",
+        "tool",
+        "status",
+    ):
         mobile_msg = dict(msg)
         if "full_text" in mobile_msg:
             mobile_msg["text"] = mobile_msg.pop("full_text")
@@ -225,6 +270,7 @@ async def _send(msg: dict) -> None:
             try:
                 await ws.send(payload)
             except Exception:
+                log.warning("Mobile WebSocket send failed", exc_info=True)
                 dead.add(ws)
         _mobile_clients.difference_update(dead)
 
@@ -235,6 +281,7 @@ def _send_threadsafe(msg: dict, loop: asyncio.AbstractEventLoop) -> None:
 
 
 # ── Speak helpers (used by background threads via threadsafe wrapper) ──────────
+
 
 async def _speak_worker() -> None:
     """Consume speak queue and forward to voice."""
@@ -255,6 +302,7 @@ async def _speak_urgent(text: str) -> None:
         try:
             _speak_queue.get_nowait()
         except Exception:
+            log.debug("Queue drain failed", exc_info=True)
             break
     await _send({"type": "stop_speech"})
     await _send({"type": "speak", "text": text, "project": ""})
@@ -291,138 +339,277 @@ def _fast_command(text: str) -> dict | None:
     t = text.lower().strip().rstrip(".,!?")
 
     if re.fullmatch(r"pause|resume|stop listening|start listening", t):
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "pause"}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {"type": "pause"},
+        }
 
     if re.fullmatch(r"(un ?lock|auto|follow focus|auto(matic)? routing)", t):
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "unlock"}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {"type": "unlock"},
+        }
 
     if re.search(r"\b(which|what)\b.{0,20}\b(project|session)\b", t):
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "which_project"}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {"type": "which_project"},
+        }
 
     if re.fullmatch(r"(last|repeat|replay|again).{0,30}(message|response|said)?", t):
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "last_message"}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {"type": "last_message"},
+        }
 
-    m = (re.match(r"(?:switch(?:ed)?(?: to)?|use|go to|open|activate)\s+(.+)", t)
-         or re.match(r"make\s+(.+?)\s+(?:the\s+)?active", t)
-         or re.match(r"(?:set|change)\s+(?:active\s+)?(?:project|session)\s+to\s+(.+)", t))
+    m = (
+        re.match(r"(?:switch(?:ed)?(?: to)?|use|go to|open|activate)\s+(.+)", t)
+        or re.match(r"make\s+(.+?)\s+(?:the\s+)?active", t)
+        or re.match(
+            r"(?:set|change)\s+(?:active\s+)?(?:project|session)\s+to\s+(.+)", t
+        )
+    )
     if m:
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "switch_project", "project": m.group(1).strip()}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {"type": "switch_project", "project": m.group(1).strip()},
+        }
 
-    m = (re.match(r"(?:rename|relabel)\s+(?:this\s+)?(?:session\s+|window\s+)?to\s+(.+)", t)
-         or re.match(r"call\s+this\s+(?:session\s+|window\s+)?(.+)", t))
+    m = re.match(
+        r"(?:rename|relabel)\s+(?:this\s+)?(?:session\s+|window\s+)?to\s+(.+)", t
+    ) or re.match(r"call\s+this\s+(?:session\s+|window\s+)?(.+)", t)
     if m:
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "rename_session", "new": m.group(1).strip()}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {"type": "rename_session", "new": m.group(1).strip()},
+        }
 
     m = re.match(r"(?:rename|relabel)\s+(.+?)\s+to\s+(.+)", t)
     if m:
-        return {"action": "command", "spoken": "", "message": "",
-                "command": {"type": "rename_session",
-                            "old": m.group(1).strip(), "new": m.group(2).strip()}}
+        return {
+            "action": "command",
+            "spoken": "",
+            "message": "",
+            "command": {
+                "type": "rename_session",
+                "old": m.group(1).strip(),
+                "new": m.group(2).strip(),
+            },
+        }
 
     return None
 
 
-def _execute_cyrus_command(ctype: str, cmd: dict, spoken: str,
-                            session_mgr, loop: asyncio.AbstractEventLoop) -> None:
+@dataclass
+class CommandResult:
+    """Return value from command handlers.
+
+    Handlers return this instead of mutating globals directly, enabling unit
+    testing without mocking locks and making thread-safety centralized in the
+    dispatcher.
+    """
+
+    spoken: str | None = None
+    speak_project: str = ""
+    new_active_project: str | None = None
+    new_project_locked: bool | None = None
+    skip_tts: bool = False
+    log_message: str = ""
+
+
+def _handle_switch_project(
+    cmd: dict, spoken: str, session_mgr, loop, active_project: str
+) -> CommandResult:
+    """Lock routing to a project matched by the given alias hint."""
+    target = _resolve_project(cmd.get("project", ""), session_mgr.aliases)
+    if target:
+        session_mgr.on_session_switch(target)
+        spoken = spoken or f"Switched to {target}. Routing locked."
+        return CommandResult(
+            new_active_project=target,
+            new_project_locked=True,
+            spoken=spoken,
+            log_message=f"[Brain] {spoken}",
+        )
+    spoken = f"No session matching '{cmd.get('project', '')}' found."
+    return CommandResult(spoken=spoken, log_message=f"[Brain] {spoken}")
+
+
+def _handle_unlock(
+    cmd: dict, spoken: str, session_mgr, loop, active_project: str
+) -> CommandResult:
+    """Release project lock and return to window-focus auto-follow mode."""
+    spoken = spoken or "Following window focus."
+    return CommandResult(
+        new_project_locked=False,
+        spoken=spoken,
+        log_message="[Brain] Routing unlocked.",
+    )
+
+
+def _handle_which_project(
+    cmd: dict, spoken: str, session_mgr, loop, active_project: str
+) -> CommandResult:
+    """Report the current active project and lock status."""
+    # Read lock flag directly — a stale read here is harmless (status query only)
+    locked = _project_locked
+    status = "locked" if locked else "following focus"
+    spoken = spoken or f"Active project: {active_project or 'none'}, {status}."
+    return CommandResult(spoken=spoken, log_message=f"[Brain] {spoken}")
+
+
+def _handle_last_message(
+    cmd: dict, spoken: str, session_mgr, loop, active_project: str
+) -> CommandResult:
+    """Replay the last recorded response for the active project via TTS."""
+    resp = session_mgr.last_response(active_project)
+    if resp:
+        # Route TTS to the project-specific channel, not the default ("") channel
+        return CommandResult(spoken=resp, speak_project=active_project)
+    spoken = spoken or f"No recorded response for {active_project or 'this session'}."
+    return CommandResult(spoken=spoken)
+
+
+def _handle_rename_session(
+    cmd: dict, spoken: str, session_mgr, loop, active_project: str
+) -> CommandResult:
+    """Rename a session alias, using active_project when no old-alias hint given."""
+    new_name = cmd.get("new", "").strip()
+    old_hint = cmd.get("old", "").strip()
+    # Resolve project: prefer explicit hint, fall back to current active project
+    proj = (
+        _resolve_project(old_hint, session_mgr.aliases) if old_hint else active_project
+    )
+    if proj and new_name:
+        old_alias = next((a for a, p in session_mgr.aliases.items() if p == proj), proj)
+        session_mgr.rename_alias(old_alias, new_name, proj)
+        spoken = spoken or f"Renamed to '{new_name}'."
+        return CommandResult(
+            spoken=spoken,
+            log_message=f"[Brain] {proj} → alias '{new_name}'\n[Brain] {spoken}",
+        )
+    spoken = spoken or "Could not find that session to rename."
+    return CommandResult(spoken=spoken, log_message=f"[Brain] {spoken}")
+
+
+def _handle_pause(
+    cmd: dict, spoken: str, session_mgr, loop, active_project: str
+) -> CommandResult:
+    """Delegate pause/resume to the voice service; suppress dispatcher TTS."""
+    asyncio.run_coroutine_threadsafe(_send({"type": "pause"}), loop)
+    return CommandResult(skip_tts=True, spoken=None)
+
+
+# Dispatch table mapping command type strings to handler functions.
+# Adding a new command = write a handler + add one entry here.
+_COMMAND_HANDLERS: dict = {
+    "switch_project": _handle_switch_project,
+    "unlock": _handle_unlock,
+    "which_project": _handle_which_project,
+    "last_message": _handle_last_message,
+    "rename_session": _handle_rename_session,
+    "pause": _handle_pause,
+}
+
+
+def _execute_cyrus_command(
+    ctype: str,
+    cmd: dict,
+    spoken: str,
+    session_mgr,
+    loop: asyncio.AbstractEventLoop,
+) -> None:
+    """Execute a Cyrus command by looking it up in _COMMAND_HANDLERS."""
     global _active_project, _project_locked
 
-    if ctype == "switch_project":
-        target = _resolve_project(cmd.get("project", ""), session_mgr.aliases)
-        if target:
-            with _active_project_lock:
-                _active_project = target
-            with _project_locked_lock:
-                _project_locked = True
-            session_mgr.on_session_switch(target, loop)
-            spoken = spoken or f"Switched to {target}. Routing locked."
-            print(f"[Brain] {spoken}")
-        else:
-            spoken = f"No session matching '{cmd.get('project', '')}' found."
-            print(f"[Brain] {spoken}")
+    log.debug("Executing command '%s'", ctype)
 
-    elif ctype == "unlock":
-        with _project_locked_lock:
-            _project_locked = False
-        spoken = spoken or "Following window focus."
-        print("[Brain] Routing unlocked.")
-
-    elif ctype == "which_project":
-        with _active_project_lock:
-            proj_name = _active_project
-        with _project_locked_lock:
-            locked = _project_locked
-        status = "locked" if locked else "following focus"
-        spoken = spoken or f"Active project: {proj_name or 'none'}, {status}."
-        print(f"[Brain] {spoken}")
-
-    elif ctype == "last_message":
-        with _active_project_lock:
-            proj_name = _active_project
-        resp = session_mgr.last_response(proj_name)
-        if resp:
-            asyncio.run_coroutine_threadsafe(
-                _speak_queue.put((proj_name, resp)), loop
-            )
-            return
-        else:
-            spoken = spoken or f"No recorded response for {proj_name or 'this session'}."
-            print(f"[Brain] {spoken}")
-
-    elif ctype == "rename_session":
-        new_name = cmd.get("new", "").strip()
-        old_hint = cmd.get("old", "").strip()
-        with _active_project_lock:
-            active = _active_project
-        proj = _resolve_project(old_hint, session_mgr.aliases) if old_hint else active
-        if proj and new_name:
-            old_alias = next((a for a, p in session_mgr.aliases.items() if p == proj), proj)
-            session_mgr.rename_alias(old_alias, new_name, proj)
-            spoken = spoken or f"Renamed to '{new_name}'."
-            print(f"[Brain] {proj} → alias '{new_name}'")
-        else:
-            spoken = spoken or "Could not find that session to rename."
-        print(f"[Brain] {spoken}")
-
-    elif ctype == "pause":
-        # Delegate to voice service
-        asyncio.run_coroutine_threadsafe(_send({"type": "pause"}), loop)
+    handler = _COMMAND_HANDLERS.get(ctype)
+    if not handler:
+        log.warning("Unknown command type: '%s'", ctype)
         return
 
-    if spoken:
-        asyncio.run_coroutine_threadsafe(_speak_queue.put(("", spoken)), loop)
+    # Snapshot _active_project under lock; handlers receive the value, not the lock
+    with _active_project_lock:
+        active_project = _active_project
+
+    try:
+        result = handler(cmd, spoken, session_mgr, loop, active_project)
+    except Exception:
+        log.exception("Error executing command '%s'", ctype)
+        return
+
+    log.info("Command '%s' completed", ctype)
+
+    # Apply state mutations under their respective locks
+    if result.new_active_project is not None:
+        with _active_project_lock:
+            _active_project = result.new_active_project
+
+    if result.new_project_locked is not None:
+        with _project_locked_lock:
+            _project_locked = result.new_project_locked
+
+    if result.log_message:
+        print(result.log_message)
+
+    if not result.skip_tts and result.spoken:
+        asyncio.run_coroutine_threadsafe(
+            _speak_queue.put((result.speak_project, result.spoken)), loop
+        )
 
 
 # ── Chat Watcher ───────────────────────────────────────────────────────────────
+
 
 class ChatWatcher:
     """
     Polls a Claude Code chat webview via UIA.
     When a new response stabilises, sends it to voice for TTS.
     """
-    POLL_SECS   = 0.5
+
+    POLL_SECS = 0.5
     STABLE_SECS = 1.2
 
-    _STOP = {"Edit automatically", "Show command menu (/)",
-             "ctrl esc to focus or unfocus Claude", "Message input"}
-    _SKIP = {"Thinking", "Message actions", "Copy code to clipboard",
-             "Stop", "Regenerate", "tasks", "New session", "Ask before edits"}
+    _STOP = {
+        "Edit automatically",
+        "Show command menu (/)",
+        "ctrl esc to focus or unfocus Claude",
+        "Message input",
+    }
+    _SKIP = {
+        "Thinking",
+        "Message actions",
+        "Copy code to clipboard",
+        "Stop",
+        "Regenerate",
+        "tasks",
+        "New session",
+        "Ask before edits",
+    }
 
     def __init__(self, project_name: str = "", target_subname: str = ""):
-        self._chat_doc               = None
-        self._last_text              = ""
-        self._last_change            = 0.0
-        self._last_spoken            = ""
+        self._chat_doc = None
+        self._last_text = ""
+        self._last_change = 0.0
+        self._last_spoken = ""
         self._new_submission_pending = False
-        self._pending_queue: list[str]  = []
-        self._response_history: deque   = deque(maxlen=10)
-        self.project_name            = project_name
-        self._target_sub             = target_subname or VSCODE_TITLE
+        self._pending_queue: list[str] = []
+        self._response_history: deque = deque(maxlen=10)
+        self.project_name = project_name
+        self._target_sub = target_subname or VSCODE_TITLE
 
     @property
     def last_spoken(self) -> str:
@@ -432,15 +619,18 @@ class ChatWatcher:
         items = self._pending_queue[:]
         self._pending_queue.clear()
         for text in items:
-            asyncio.run_coroutine_threadsafe(_speak_queue.put((self.project_name, text)), loop)
+            asyncio.run_coroutine_threadsafe(
+                _speak_queue.put((self.project_name, text)), loop
+            )
         return len(items)
 
     def _find_webview(self):
         vscode = auto.WindowControl(searchDepth=1, SubName=self._target_sub)
         if not vscode.Exists(3):
             return None
-        chrome = vscode.PaneControl(searchDepth=12,
-                                    ClassName="Chrome_RenderWidgetHostHWND")
+        chrome = vscode.PaneControl(
+            searchDepth=12, ClassName="Chrome_RenderWidgetHostHWND"
+        )
         if not chrome.Exists(2):
             return None
         docs: list[tuple[int, auto.Control]] = []
@@ -452,14 +642,14 @@ class ChatWatcher:
                 if ctrl.ControlTypeName == "DocumentControl":
                     docs.append((d, ctrl))
             except Exception:
-                pass
+                log.debug("UIA operation failed", exc_info=True)
             try:
                 child = ctrl.GetFirstChildControl()
                 while child:
                     collect(child, d + 1)
                     child = child.GetNextSiblingControl()
             except Exception:
-                pass
+                log.debug("UIA operation failed", exc_info=True)
 
         collect(chrome)
         unnamed = [(d, c) for d, c in docs if not (c.Name or "").strip()]
@@ -473,26 +663,29 @@ class ChatWatcher:
         if depth > max_depth:
             return out
         try:
-            name  = (ctrl.Name or "").strip()
+            name = (ctrl.Name or "").strip()
             ctype = ctrl.ControlTypeName or ""
             if len(name) >= 4:
                 out.append((depth, ctype, name))
         except Exception:
-            pass
+            log.debug("UIA operation failed", exc_info=True)
         try:
             child = ctrl.GetFirstChildControl()
             while child:
                 self._walk(child, depth + 1, max_depth, out)
                 child = child.GetNextSiblingControl()
         except Exception:
-            pass
+            log.debug("UIA operation failed", exc_info=True)
         return out
 
     def _extract_response(self, results):
         msg_input_pos = next(
-            (i for i, (_, ct, tx) in enumerate(results)
-             if ct == "EditControl" and tx == _CHAT_INPUT_HINT),
-            -1
+            (
+                i
+                for i, (_, ct, tx) in enumerate(results)
+                if ct == "EditControl" and tx == _CHAT_INPUT_HINT
+            ),
+            -1,
         )
         if msg_input_pos == -1:
             return ""
@@ -513,9 +706,9 @@ class ChatWatcher:
             return ""
 
         parts: list[str] = []
-        seen:  set[str]  = set()
+        seen: set[str] = set()
 
-        for _, ctype, text in results[start + 1: msg_input_pos]:
+        for _, ctype, text in results[start + 1 : msg_input_pos]:
             if text in self._STOP:
                 break
             if ctype == "ButtonControl" and text == "Message actions":
@@ -524,7 +717,9 @@ class ChatWatcher:
                 continue
             if ctype not in ("TextControl", "ListItemControl"):
                 continue
-            if text not in seen and not any(text in s for s in seen if len(s) > len(text)):
+            if text not in seen and not any(
+                text in s for s in seen if len(s) > len(text)
+            ):
                 seen.add(text)
                 parts.append(text)
 
@@ -532,7 +727,9 @@ class ChatWatcher:
 
     def start(self, loop: asyncio.AbstractEventLoop, is_active_fn=None):
         if is_active_fn is None:
-            is_active_fn = lambda: True
+
+            def is_active_fn():
+                return True
 
         def poll():
             comtypes.CoInitializeEx()
@@ -557,10 +754,12 @@ class ChatWatcher:
                                     (r.left + r.right) // 2,
                                     (r.top + r.bottom) // 2,
                                 )
-                                print(f"[Brain] {label}Chat input coords cached: "
-                                      f"{_chat_input_coords.get(self.project_name)}")
-                except Exception as e:
-                    print(f"[Brain] {label}Coords cache error: {e}")
+                                print(
+                                    f"[Brain] {label}Chat input coords cached: "
+                                    f"{_chat_input_coords.get(self.project_name)}"
+                                )
+                except Exception:
+                    log.debug("Coords cache error for %s", self.project_name, exc_info=True)
 
             seed = ""
             for _ in range(6):
@@ -569,32 +768,36 @@ class ChatWatcher:
                     if seed:
                         break
                 except Exception:
+                    log.warning("Response extraction retry failed", exc_info=True)
                     seed = ""
                 time.sleep(1.0)
             self._last_spoken = seed
-            self._last_text   = seed
+            self._last_text = seed
             self._last_change = time.time()
 
             while True:
                 time.sleep(self.POLL_SECS)
                 try:
-                    results  = self._walk(self._chat_doc)
+                    results = self._walk(self._chat_doc)
                     response = self._extract_response(results)
-                    now      = time.time()
+                    now = time.time()
 
                     # Detect new user submission via Message actions count
                     msg_actions_count = sum(
-                        1 for _, ct, tx in results
+                        1
+                        for _, ct, tx in results
                         if ct == "ButtonControl" and tx == "Message actions"
                     )
-                    if msg_actions_count != getattr(self, "_last_msg_actions_count", -1):
+                    if msg_actions_count != getattr(
+                        self, "_last_msg_actions_count", -1
+                    ):
                         prev = getattr(self, "_last_msg_actions_count", -1)
                         self._last_msg_actions_count = msg_actions_count
                         if prev != -1 and msg_actions_count > prev:
                             self._new_submission_pending = True
 
                     if response != self._last_text:
-                        self._last_text   = response
+                        self._last_text = response
                         self._last_change = now
                         if self._new_submission_pending:
                             self._new_submission_pending = False
@@ -608,22 +811,30 @@ class ChatWatcher:
                             if not seed:
                                 seed = response
                                 continue
-                            spoken  = clean_for_speech(response)
+                            spoken = clean_for_speech(response)
                             self._response_history.append(spoken)
                             preview = spoken[:80] + ("..." if len(spoken) > 80 else "")
-                            print(f"\nCyrus [{self.project_name or 'Claude'}]: {preview}")
+                            print(
+                                f"\nCyrus [{self.project_name or 'Claude'}]: {preview}"
+                            )
 
                             if is_active_fn():
                                 asyncio.run_coroutine_threadsafe(
-                                    _speak_queue.put((self.project_name, spoken, response)), loop
+                                    _speak_queue.put(
+                                        (self.project_name, spoken, response)
+                                    ),
+                                    loop,
                                 )
                             else:
                                 self._pending_queue.append(spoken)
                                 _send_threadsafe({"type": "chime"}, loop)
-                                print(f"[queued: {self.project_name}] "
-                                      f"{len(self._pending_queue)} message(s) waiting")
+                                print(
+                                    f"[queued: {self.project_name}] "
+                                    f"{len(self._pending_queue)} message(s) waiting"
+                                )
 
                 except Exception:
+                    log.warning("Chat poll error; re-finding webview", exc_info=True)
                     self._chat_doc = None
                     while self._chat_doc is None:
                         self._chat_doc = self._find_webview()
@@ -635,39 +846,50 @@ class ChatWatcher:
 
 # ── Permission Watcher ─────────────────────────────────────────────────────────
 
+
 class PermissionWatcher:
     """
     Polls Claude Code's chat webview for permission dialogs and input prompts.
     """
-    POLL_SECS   = 0.3
-    ALLOW_WORDS = {"yes", "allow", "sure", "ok", "okay", "proceed", "yep", "yeah", "go"}
-    DENY_WORDS  = {"no", "deny", "cancel", "stop", "nope", "reject"}
 
-    _SKIP_PROMPT_NAMES  = {_CHAT_INPUT_HINT, ""}
+    POLL_SECS = 0.3
+    ALLOW_WORDS = {"yes", "allow", "sure", "ok", "okay", "proceed", "yep", "yeah", "go"}
+    DENY_WORDS = {"no", "deny", "cancel", "stop", "nope", "reject"}
+
+    _SKIP_PROMPT_NAMES = {_CHAT_INPUT_HINT, ""}
     _SKIP_PROMPT_LABELS = {"search", "find", "replace", "filter", "go to line"}
 
     # Tools that never trigger permission dialogs — always auto-allowed
     _AUTO_ALLOWED_TOOLS = {
-        "Read", "Grep", "Glob", "Agent", "TodoWrite", "TodoRead",
-        "AskFollowupQuestion", "AskUserQuestion", "Skill", "ToolSearch",
-        "TaskOutput", "TaskStop",
+        "Read",
+        "Grep",
+        "Glob",
+        "Agent",
+        "TodoWrite",
+        "TodoRead",
+        "AskFollowupQuestion",
+        "AskUserQuestion",
+        "Skill",
+        "ToolSearch",
+        "TaskOutput",
+        "TaskStop",
     }
 
     def __init__(self, project_name: str = "", target_subname: str = ""):
-        self._chat_doc          = None
-        self._vscode_win        = None   # cached VS Code WindowControl
-        self._pending           = False
-        self._allow_btn         = None
-        self._announced         = ""
-        self._pre_armed         = False   # hook pre-armed, waiting for UIA confirmation
-        self._pre_armed_tool    = ""
-        self._pre_armed_cmd     = ""
-        self._pre_armed_since   = 0.0
-        self._prompt_pending    = False
+        self._chat_doc = None
+        self._vscode_win = None  # cached VS Code WindowControl
+        self._pending = False
+        self._allow_btn = None
+        self._announced = ""
+        self._pre_armed = False  # hook pre-armed, waiting for UIA confirmation
+        self._pre_armed_tool = ""
+        self._pre_armed_cmd = ""
+        self._pre_armed_since = 0.0
+        self._prompt_pending = False
         self._prompt_input_ctrl = None
-        self._prompt_announced  = ""
-        self.project_name       = project_name
-        self._target_sub        = target_subname or VSCODE_TITLE
+        self._prompt_announced = ""
+        self.project_name = project_name
+        self._target_sub = target_subname or VSCODE_TITLE
 
     @property
     def is_pending(self):
@@ -682,8 +904,9 @@ class PermissionWatcher:
         if not vscode.Exists(3):
             return None
         self._vscode_win = vscode
-        chrome = vscode.PaneControl(searchDepth=12,
-                                    ClassName="Chrome_RenderWidgetHostHWND")
+        chrome = vscode.PaneControl(
+            searchDepth=12, ClassName="Chrome_RenderWidgetHostHWND"
+        )
         if not chrome.Exists(2):
             return None
         docs: list[tuple[int, auto.Control]] = []
@@ -695,14 +918,14 @@ class PermissionWatcher:
                 if ctrl.ControlTypeName == "DocumentControl":
                     docs.append((d, ctrl))
             except Exception:
-                pass
+                log.debug("UIA operation failed", exc_info=True)
             try:
                 child = ctrl.GetFirstChildControl()
                 while child:
                     collect(child, d + 1)
                     child = child.GetNextSiblingControl()
             except Exception:
-                pass
+                log.debug("UIA operation failed", exc_info=True)
 
         collect(chrome)
         unnamed = [(d, c) for d, c in docs if not (c.Name or "").strip()]
@@ -726,12 +949,13 @@ class PermissionWatcher:
                 self._vscode_win = vscode
 
             # Find the Chrome pane (entire VS Code workbench is one Chrome widget)
-            chrome = vscode.PaneControl(searchDepth=20,
-                                        ClassName="Chrome_RenderWidgetHostHWND")
+            chrome = vscode.PaneControl(
+                searchDepth=20, ClassName="Chrome_RenderWidgetHostHWND"
+            )
             if not chrome.Exists(1):
                 return "", False
 
-            aria_text  = ""
+            aria_text = ""
             found_perm = False
 
             def walk(ctrl, d=0):
@@ -740,10 +964,13 @@ class PermissionWatcher:
                     return
                 try:
                     name = (ctrl.Name or "").strip()
-                    cls  = ctrl.ClassName or ""
+                    cls = ctrl.ClassName or ""
                     # ARIA live region — VS Code announces permission dialogs here
-                    if cls == "monaco-alert" and "requesting permission" in name.lower():
-                        aria_text  = name
+                    if (
+                        cls == "monaco-alert"
+                        and "requesting permission" in name.lower()
+                    ):
+                        aria_text = name
                         found_perm = True
                     # Also catch if "Allow this" appears directly at shallow depth
                     if "Allow this" in name:
@@ -751,18 +978,19 @@ class PermissionWatcher:
                         if not aria_text:
                             aria_text = name
                 except Exception:
-                    pass
+                    log.debug("UIA operation failed", exc_info=True)
                 try:
                     child = ctrl.GetFirstChildControl()
                     while child:
                         walk(child, d + 1)
                         child = child.GetNextSiblingControl()
                 except Exception:
-                    pass
+                    log.debug("UIA operation failed", exc_info=True)
 
             walk(chrome)
             return aria_text, found_perm
         except Exception:
+            log.warning("Permission window scan failed", exc_info=True)
             return "", False
 
     def _scan(self):
@@ -774,19 +1002,19 @@ class PermissionWatcher:
             if d > 12:
                 return
             try:
-                name  = (ctrl.Name or "").strip()
+                name = (ctrl.Name or "").strip()
                 ctype = ctrl.ControlTypeName or ""
                 if name:
                     items.append((d, ctype, name, ctrl))
             except Exception:
-                pass
+                log.debug("UIA operation failed", exc_info=True)
             try:
                 child = ctrl.GetFirstChildControl()
                 while child:
                     walk(child, d + 1)
                     child = child.GetNextSiblingControl()
             except Exception:
-                pass
+                log.debug("UIA operation failed", exc_info=True)
 
         walk(self._chat_doc)
 
@@ -803,7 +1031,7 @@ class PermissionWatcher:
                                 (r.top + r.bottom) // 2,
                             )
                     except Exception:
-                        pass
+                        log.debug("Bounding rect read failed in scan", exc_info=True)
                     break
 
         # ── Permission detection: chat webview first, then VS Code window scan ─
@@ -811,18 +1039,23 @@ class PermissionWatcher:
 
         # 1. Webview scan — "Yes, allow" button in chat panel
         allow_idx = next(
-            (i for i, (_, ct, n, _) in enumerate(items)
-             if ct in ("TextControl", "StaticTextControl") and "Allow this" in n),
+            (
+                i
+                for i, (_, ct, n, _) in enumerate(items)
+                if ct in ("TextControl", "StaticTextControl") and "Allow this" in n
+            ),
             -1,
         )
         if allow_idx != -1:
             cmd = ""
-            for _, ct2, n2, _ in items[allow_idx + 1: allow_idx + 10]:
+            for _, ct2, n2, _ in items[allow_idx + 1 : allow_idx + 10]:
                 if ct2 == "TextControl" and len(n2) > 2:
                     cmd = n2
                     break
-            for _, ctype, name, ctrl in items[allow_idx:allow_idx + 20]:
-                if ctype == "ButtonControl" and re.search(r"\byes\b|\ballow\b", name, re.IGNORECASE):
+            for _, ctype, name, ctrl in items[allow_idx : allow_idx + 20]:
+                if ctype == "ButtonControl" and re.search(
+                    r"\byes\b|\ballow\b", name, re.IGNORECASE
+                ):
                     perm_btn, perm_cmd = ctrl, cmd
                     break
 
@@ -831,8 +1064,8 @@ class PermissionWatcher:
             cmd, found = self._scan_window_for_permission()
             if found:
                 # Sentinel: perm_btn="keyboard" signals keyboard-based approval
-                perm_btn  = "keyboard"
-                perm_cmd  = cmd
+                perm_btn = "keyboard"
+                perm_cmd = cmd
 
         prompt_ctrl, prompt_label = None, ""
         for i, (_, ctype, name, ctrl) in enumerate(items):
@@ -856,16 +1089,18 @@ class PermissionWatcher:
 
         return perm_btn, perm_cmd, prompt_ctrl, prompt_label
 
-    def arm_from_hook(self, tool: str, cmd: str, loop: asyncio.AbstractEventLoop) -> None:
+    def arm_from_hook(
+        self, tool: str, cmd: str, loop: asyncio.AbstractEventLoop
+    ) -> None:
         """Arm from PreToolUse hook — skip auto-allowed tools, announce others immediately."""
         if tool in self._AUTO_ALLOWED_TOOLS:
             return  # never needs permission
         if self._pending:
             return  # already waiting for a response
-        self._allow_btn     = "keyboard"
-        self._pending       = True
+        self._allow_btn = "keyboard"
+        self._pending = True
         self._pending_since = time.time()
-        self._announced     = f"hook:{cmd}"
+        self._announced = f"hook:{cmd}"
         prefix = f"In {self.project_name}: " if self.project_name else ""
         cmd_short = cmd[:120] if cmd else tool
         prompt = f"{prefix}Allow {tool}: {cmd_short}. Say yes or no."
@@ -886,7 +1121,7 @@ class PermissionWatcher:
                     try:
                         vscode.SetFocus()
                     except Exception:
-                        pass
+                        log.debug("SetFocus failed on allow", exc_info=True)
                 pyautogui.press("1")
             else:
                 clicked = False
@@ -894,10 +1129,10 @@ class PermissionWatcher:
                     self._allow_btn.Click()
                     clicked = True
                 except Exception:
-                    pass
+                    log.warning("Permission button click failed", exc_info=True)
                 if not clicked:
                     pyautogui.press("enter")
-            self._pending   = False
+            self._pending = False
             self._allow_btn = None
             return True
         if words & self.DENY_WORDS:
@@ -907,9 +1142,9 @@ class PermissionWatcher:
                 try:
                     vscode.SetFocus()
                 except Exception:
-                    pass
+                    log.debug("SetFocus failed on deny", exc_info=True)
             pyautogui.press("escape")
-            self._pending   = False
+            self._pending = False
             self._allow_btn = None
             return True
         return False
@@ -917,7 +1152,15 @@ class PermissionWatcher:
     def handle_prompt_response(self, text: str) -> bool:
         if not self._prompt_pending or not self._prompt_input_ctrl:
             return False
-        cancel = {"cancel", "escape", "never mind", "nevermind", "stop", "dismiss", "close"}
+        cancel = {
+            "cancel",
+            "escape",
+            "never mind",
+            "nevermind",
+            "stop",
+            "dismiss",
+            "close",
+        }
         if text.lower().strip() in cancel:
             pyautogui.press("escape")
             print(f"[Brain] → Dismissed prompt ({self.project_name or 'session'})")
@@ -932,9 +1175,9 @@ class PermissionWatcher:
                 time.sleep(0.05)
                 pyautogui.press("enter")
                 print(f"[Brain] → Prompt answered: {text!r}")
-            except Exception as e:
-                print(f"[Brain] Prompt input error: {e}")
-        self._prompt_pending    = False
+            except Exception:
+                log.error("Prompt input error", exc_info=True)
+        self._prompt_pending = False
         self._prompt_input_ctrl = None
         return True
 
@@ -963,56 +1206,71 @@ class PermissionWatcher:
                     if btn:
                         if not self._pending:
                             # Dialog confirmed by UIA — announce it
-                            self._allow_btn     = btn
-                            self._pending       = True
+                            self._allow_btn = btn
+                            self._pending = True
                             self._pending_since = time.time()
                             # Use richer hook info if pre-armed, else UIA-scanned cmd
                             if self._pre_armed:
                                 tool_label = self._pre_armed_tool
-                                cmd_label  = self._pre_armed_cmd[:120] or tool_label
+                                cmd_label = self._pre_armed_cmd[:120] or tool_label
                                 self._announced = f"hook:{self._pre_armed_cmd}"
                             else:
                                 tool_label = ""
-                                cmd_label  = cmd[:120] if cmd else ""
+                                cmd_label = cmd[:120] if cmd else ""
                                 self._announced = cmd
                             self._pre_armed = False
-                            prefix = f"In {self.project_name}: " if self.project_name else ""
+                            prefix = (
+                                f"In {self.project_name}: " if self.project_name else ""
+                            )
                             if tool_label:
                                 prompt = f"{prefix}Allow {tool_label}: {cmd_label}. Say yes or no."
                             else:
                                 prompt = f"{prefix}Allow: {cmd_label}. Say yes or no."
-                            print(f"\n[Permission] {prefix}Claude wants to run: {cmd_label}")
+                            print(
+                                f"\n[Permission] {prefix}Claude wants to run: {cmd_label}"
+                            )
                             _send_threadsafe({"type": "stop_speech"}, loop)
-                            asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
+                            asyncio.run_coroutine_threadsafe(
+                                _speak_urgent(prompt), loop
+                            )
                         elif btn != "keyboard" and self._allow_btn == "keyboard":
                             # Hook armed with keyboard fallback — upgrade to real UIA button
                             self._allow_btn = btn
                     elif not btn:
                         self._announced = ""
                         # Clear pre-arm if no dialog appeared within 2 s (tool was auto-allowed)
-                        if self._pre_armed and time.time() > self._pre_armed_since + 2.0:
+                        if (
+                            self._pre_armed
+                            and time.time() > self._pre_armed_since + 2.0
+                        ):
                             self._pre_armed = False
                         # Keep pending for 20 s after announcement so transient
                         # UIA misses don't clear it before the user responds.
-                        if self._pending and time.time() > getattr(self, "_pending_since", 0) + 20:
-                            self._pending   = False
+                        if (
+                            self._pending
+                            and time.time() > getattr(self, "_pending_since", 0) + 20
+                        ):
+                            self._pending = False
                             self._allow_btn = None
 
                     if p_ctrl and p_label != self._prompt_announced:
                         self._prompt_input_ctrl = p_ctrl
-                        self._prompt_pending    = True
-                        self._prompt_announced  = p_label
-                        prefix = f"In {self.project_name}: " if self.project_name else ""
+                        self._prompt_pending = True
+                        self._prompt_announced = p_label
+                        prefix = (
+                            f"In {self.project_name}: " if self.project_name else ""
+                        )
                         prompt = f"{prefix}{p_label}"
                         print(f"\n[Input Prompt] {prompt}")
                         asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
                     elif not p_ctrl:
                         self._prompt_announced = ""
                         if self._prompt_pending:
-                            self._prompt_pending    = False
+                            self._prompt_pending = False
                             self._prompt_input_ctrl = None
 
                 except Exception:
+                    log.warning("Permission poll error; re-finding webview", exc_info=True)
                     self._chat_doc = None
                     while self._chat_doc is None:
                         self._chat_doc = self._find_webview()
@@ -1024,11 +1282,12 @@ class PermissionWatcher:
 
 # ── Session Manager ────────────────────────────────────────────────────────────
 
+
 class SessionManager:
     def __init__(self):
-        self._chat_watchers: dict[str, ChatWatcher]       = {}
+        self._chat_watchers: dict[str, ChatWatcher] = {}
         self._perm_watchers: dict[str, PermissionWatcher] = {}
-        self._aliases:       dict[str, str]               = {}
+        self._aliases: dict[str, str] = {}
 
     @property
     def aliases(self) -> dict[str, str]:
@@ -1061,7 +1320,7 @@ class SessionManager:
         global _whisper_prompt
         alias = _make_alias(proj)
         self._aliases[alias] = proj
-        print(f"[Brain] Session detected: {proj}  (say \"switch to {alias}\")")
+        print(f'[Brain] Session detected: {proj}  (say "switch to {alias}")')
         names = " ".join(p for p in self._chat_watchers) + f" {proj}"
         _whisper_prompt = f"Cyrus, switch to {names.strip()}."
         # Push updated prompt to voice
@@ -1087,26 +1346,26 @@ class SessionManager:
                         if proj not in self._chat_watchers:
                             self._add_session(proj, subname, loop)
                 except Exception:
-                    pass
+                    log.debug("Window discovery scan failed", exc_info=True)
                 time.sleep(5)
 
         try:
             for proj, subname in _vs_code_windows():
                 self._add_session(proj, subname, loop)
         except Exception:
-            pass
+            log.debug("Initial window discovery failed", exc_info=True)
 
         if self.multi_session:
             names = " | ".join(f'"{a}"' for a in self._aliases)
-            print(f'[Brain] {len(self._chat_watchers)} sessions: {names}')
+            print(f"[Brain] {len(self._chat_watchers)} sessions: {names}")
 
         threading.Thread(target=scan, daemon=True).start()
 
 
 # ── Active window tracker ──────────────────────────────────────────────────────
 
-def _start_active_tracker(session_mgr: SessionManager,
-                           loop: asyncio.AbstractEventLoop):
+
+def _start_active_tracker(session_mgr: SessionManager, loop: asyncio.AbstractEventLoop):
     global _active_project
     while True:
         try:
@@ -1123,15 +1382,16 @@ def _start_active_tracker(session_mgr: SessionManager,
                     print(f"[Brain] Active project: {proj}")
                     session_mgr.on_session_switch(proj, loop)
         except Exception:
-            pass
+            log.debug("Active window tracker failed", exc_info=True)
         time.sleep(0.5)
 
 
 # ── VS Code submit ─────────────────────────────────────────────────────────────
 
+
 def _find_chat_input(target_subname: str = "") -> object:
     subname = target_subname or VSCODE_TITLE
-    vscode  = auto.WindowControl(searchDepth=1, SubName=subname)
+    vscode = auto.WindowControl(searchDepth=1, SubName=subname)
     if not vscode.Exists(2):
         vscode = auto.WindowControl(searchDepth=1, SubName=VSCODE_TITLE)
         if not vscode.Exists(2):
@@ -1139,8 +1399,7 @@ def _find_chat_input(target_subname: str = "") -> object:
     ctrl = vscode.EditControl(searchDepth=12, Name=_CHAT_INPUT_HINT)
     if ctrl.Exists(2):
         return ctrl
-    chrome = vscode.PaneControl(searchDepth=12,
-                                ClassName="Chrome_RenderWidgetHostHWND")
+    chrome = vscode.PaneControl(searchDepth=12, ClassName="Chrome_RenderWidgetHostHWND")
     if not chrome.Exists(2):
         return None
     found: list[tuple[int, object]] = []
@@ -1152,14 +1411,14 @@ def _find_chat_input(target_subname: str = "") -> object:
             if ctrl.ControlTypeName == "EditControl":
                 found.append((d, ctrl))
         except Exception:
-            pass
+            log.debug("UIA operation failed", exc_info=True)
         try:
             child = ctrl.GetFirstChildControl()
             while child:
                 _walk(child, d + 1)
                 child = child.GetNextSiblingControl()
         except Exception:
-            pass
+            log.debug("UIA operation failed", exc_info=True)
 
     _walk(chrome)
     if not found:
@@ -1175,17 +1434,18 @@ def _open_companion_connection(safe: str) -> socket.socket:
     Windows: TCP localhost, port read from %LOCALAPPDATA%\\cyrus\\companion-{safe}.port
     Unix/Mac: AF_UNIX socket at /tmp/cyrus-companion-{safe}.sock
     """
-    if os.name == 'nt':
-        base = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
-        port_file = os.path.join(base, 'cyrus', f'companion-{safe}.port')
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+        port_file = os.path.join(base, "cyrus", f"companion-{safe}.port")
         port = int(open(port_file).read().strip())
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(10)
-        s.connect(('127.0.0.1', port))
+        s.connect(("127.0.0.1", port))
         return s
     else:
         import tempfile
-        sock_path = os.path.join(tempfile.gettempdir(), f'cyrus-companion-{safe}.sock')
+
+        sock_path = os.path.join(tempfile.gettempdir(), f"cyrus-companion-{safe}.sock")
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(10)
         s.connect(sock_path)
@@ -1202,7 +1462,7 @@ def _submit_via_extension(text: str) -> bool:
     with _active_project_lock:
         proj = _active_project
 
-    safe = re.sub(r'[^\w\-]', '_', proj or "default")[:40]
+    safe = re.sub(r"[^\w\-]", "_", proj or "default")[:40]
 
     try:
         with _open_companion_connection(safe) as s:
@@ -1224,8 +1484,8 @@ def _submit_via_extension(text: str) -> bool:
     except (ConnectionRefusedError, OSError) as e:
         print(f"[Brain] Companion extension unavailable: {e}")
         return False
-    except Exception as e:
-        print(f"[Brain] Companion extension error: {e}")
+    except Exception:
+        log.error("Companion extension error", exc_info=True)
         return False
 
 
@@ -1262,7 +1522,7 @@ def _submit_to_vscode_impl(text: str) -> bool:
                     coords = ((r.left + r.right) // 2, (r.top + r.bottom) // 2)
                     _chat_input_coords[proj] = coords
             except Exception:
-                pass
+                log.debug("Chat input coord caching failed", exc_info=True)
         if not coords:
             print("[!] Claude chat input not found.")
             return False
@@ -1274,13 +1534,16 @@ def _submit_to_vscode_impl(text: str) -> bool:
             if VSCODE_TITLE not in (win.title or ""):
                 raise ValueError("wrong window")
         except Exception:
+            log.debug("Window cache invalid, clearing", exc_info=True)
             win = None
             _vscode_win_cache.pop(proj, None)
 
     if win is None:
-        matches = [w for w in gw.getAllWindows()
-                   if VSCODE_TITLE in (w.title or "")
-                   and (not proj or proj in w.title)]
+        matches = [
+            w
+            for w in gw.getAllWindows()
+            if VSCODE_TITLE in (w.title or "") and (not proj or proj in w.title)
+        ]
         if not matches:
             matches = [w for w in gw.getAllWindows() if VSCODE_TITLE in (w.title or "")]
         if not matches:
@@ -1293,7 +1556,7 @@ def _submit_to_vscode_impl(text: str) -> bool:
         win.activate()
         time.sleep(0.25)
     except Exception:
-        pass
+        log.debug("Window activation failed", exc_info=True)
 
     # ── 3. Click chat input by pixel coords ───────────────────────────────────
     pyautogui.click(*coords)
@@ -1304,7 +1567,7 @@ def _submit_to_vscode_impl(text: str) -> bool:
     try:
         saved = pyperclip.paste()
     except Exception:
-        pass
+        log.debug("Clipboard save failed", exc_info=True)
 
     pyperclip.copy(text)
     pyautogui.hotkey("ctrl", "v")
@@ -1313,7 +1576,7 @@ def _submit_to_vscode_impl(text: str) -> bool:
     try:
         win.activate()
     except Exception:
-        pass
+        log.debug("Window re-activation failed", exc_info=True)
     time.sleep(0.05)
     pyautogui.press("enter")
     time.sleep(0.05)
@@ -1321,7 +1584,7 @@ def _submit_to_vscode_impl(text: str) -> bool:
     try:
         pyperclip.copy(saved)
     except Exception:
-        pass
+        log.debug("Clipboard restore failed", exc_info=True)
 
     return True
 
@@ -1342,17 +1605,20 @@ def _submit_worker() -> None:
         text, ev, result_holder = _submit_request_queue.get()
         try:
             result_holder[0] = _submit_to_vscode_impl(text)
-        except Exception as e:
-            print(f"[Brain] Submit error: {e}")
+        except Exception:
+            log.error("Submit worker error", exc_info=True)
             result_holder[0] = False
         ev.set()
 
 
 # ── Voice reader — process incoming messages from voice service ────────────────
 
-async def voice_reader(reader: asyncio.StreamReader,
-                        session_mgr: SessionManager,
-                        loop: asyncio.AbstractEventLoop) -> None:
+
+async def voice_reader(
+    reader: asyncio.StreamReader,
+    session_mgr: SessionManager,
+    loop: asyncio.AbstractEventLoop,
+) -> None:
     global _conversation_active, _tts_active_remote
 
     while True:
@@ -1360,7 +1626,7 @@ async def voice_reader(reader: asyncio.StreamReader,
             line = await reader.readline()
             if not line:
                 break
-            msg   = json.loads(line.decode().strip())
+            msg = json.loads(line.decode().strip())
             mtype = msg.get("type", "")
 
             if mtype == "tts_start":
@@ -1370,7 +1636,7 @@ async def voice_reader(reader: asyncio.StreamReader,
                 _tts_active_remote = False
 
             elif mtype == "utterance":
-                text       = msg.get("text", "").strip()
+                text = msg.get("text", "").strip()
                 during_tts = msg.get("during_tts", False)
                 if not text:
                     continue
@@ -1378,12 +1644,13 @@ async def voice_reader(reader: asyncio.StreamReader,
 
         except json.JSONDecodeError:
             pass
-        except Exception as e:
-            print(f"[Brain] Voice reader error: {e}")
+        except Exception:
+            log.error("Voice reader error", exc_info=True)
             break
 
 
 # ── Mobile WebSocket handler ──────────────────────────────────────────────────
+
 
 async def handle_mobile_ws(ws) -> None:
     """Handle a single mobile WebSocket client."""
@@ -1403,18 +1670,22 @@ async def handle_mobile_ws(ws) -> None:
                     await ws.send(json.dumps({"type": "pong"}))
             except json.JSONDecodeError:
                 pass
-    except Exception as e:
-        print(f"[Brain] Mobile client error: {type(e).__name__}: {e}")
+    except Exception:
+        log.error("Mobile client error", exc_info=True)
     finally:
         _mobile_clients.discard(ws)
-        print(f"[Brain] Mobile client disconnected: {addr} "
-              f"(close_code={ws.close_code}, close_reason={ws.close_reason})")
+        print(
+            f"[Brain] Mobile client disconnected: {addr} "
+            f"(close_code={ws.close_code}, close_reason={ws.close_reason})"
+        )
 
 
 # ── Utterance routing loop ─────────────────────────────────────────────────────
 
-async def routing_loop(session_mgr: SessionManager,
-                        loop: asyncio.AbstractEventLoop) -> None:
+
+async def routing_loop(
+    session_mgr: SessionManager, loop: asyncio.AbstractEventLoop
+) -> None:
     global _conversation_active, _active_project
 
     while True:
@@ -1422,7 +1693,7 @@ async def routing_loop(session_mgr: SessionManager,
 
         # Echo guard: only wake-word interrupts get through during TTS
         if during_tts or _tts_active_remote:
-            fw       = text.lower().strip().split()
+            fw = text.lower().strip().split()
             has_wake = any(w.rstrip(",.!?") in WAKE_WORDS for w in fw)
             if not has_wake:
                 continue
@@ -1446,7 +1717,7 @@ async def routing_loop(session_mgr: SessionManager,
                 ws = text.lower().strip().split()
                 if ws and ws[0].rstrip(",.!?") in WAKE_WORDS:
                     parts = text.split(None, 1)
-                    text  = parts[1].lstrip(", ").strip() if len(parts) > 1 else text
+                    text = parts[1].lstrip(", ").strip() if len(parts) > 1 else text
                 if pw.handle_prompt_response(text):
                     handled = True
                     break
@@ -1479,8 +1750,10 @@ async def routing_loop(session_mgr: SessionManager,
                     )
                     fw = follow_text.lower().strip().split()
                     if fw and fw[0].rstrip(",.!?") in WAKE_WORDS:
-                        parts      = follow_text.split(None, 1)
-                        follow_text = parts[1].lstrip(", ").strip() if len(parts) > 1 else ""
+                        parts = follow_text.split(None, 1)
+                        follow_text = (
+                            parts[1].lstrip(", ").strip() if len(parts) > 1 else ""
+                        )
                     text = follow_text
                     if not text:
                         print("(no command heard)")
@@ -1497,20 +1770,35 @@ async def routing_loop(session_mgr: SessionManager,
             with _active_project_lock:
                 proj = _active_project
             if _is_answer_request(text):
-                resp = session_mgr.last_response(proj) or "I don't have a recent response to share."
+                resp = (
+                    session_mgr.last_response(proj)
+                    or "I don't have a recent response to share."
+                )
                 resp_words = resp.split()
                 if len(resp_words) > 30:
                     resp = " ".join(resp_words[:30]) + ". See the chat for more."
-                decision = {"action": "answer", "spoken": resp, "message": "", "command": {}}
+                decision = {
+                    "action": "answer",
+                    "spoken": resp,
+                    "message": "",
+                    "command": {},
+                }
             else:
-                decision = {"action": "forward", "message": text, "spoken": "", "command": {}}
+                decision = {
+                    "action": "forward",
+                    "message": text,
+                    "spoken": "",
+                    "command": {},
+                }
 
         action = decision.get("action", "forward")
 
         if action == "answer":
             spoken = decision.get("spoken", "")
             if spoken:
-                print(f"\n[Brain answers] {spoken[:80]}{'...' if len(spoken) > 80 else ''}")
+                print(
+                    f"\n[Brain answers] {spoken[:80]}{'...' if len(spoken) > 80 else ''}"
+                )
                 await _speak_queue.put(("", spoken))
             _conversation_active = False
 
@@ -1518,8 +1806,9 @@ async def routing_loop(session_mgr: SessionManager,
             ctype = decision.get("command", {}).get("type", "")
             spoken = decision.get("spoken", "")
             print(f"\n[Brain command] {ctype}")
-            _execute_cyrus_command(ctype, decision.get("command", {}),
-                                   spoken, session_mgr, loop)
+            _execute_cyrus_command(
+                ctype, decision.get("command", {}), spoken, session_mgr, loop
+            )
             _conversation_active = spoken.rstrip().endswith("?")
 
         else:  # "forward"
@@ -1547,6 +1836,7 @@ async def routing_loop(session_mgr: SessionManager,
 
 # ── Hook handler ──────────────────────────────────────────────────────────────
 
+
 def _resolve_project_from_cwd(cwd: str, session_mgr: "SessionManager") -> str:
     """Match the trailing folder of cwd against known project names."""
     if not cwd:
@@ -1560,9 +1850,11 @@ def _resolve_project_from_cwd(cwd: str, session_mgr: "SessionManager") -> str:
         return _active_project
 
 
-async def handle_hook_connection(reader: asyncio.StreamReader,
-                                  writer: asyncio.StreamWriter,
-                                  session_mgr: "SessionManager") -> None:
+async def handle_hook_connection(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    session_mgr: "SessionManager",
+) -> None:
     """
     Accepts a single connection from cyrus_hook.py, reads one JSON message,
     and dispatches on event type: stop / pre_tool / post_tool / notification.
@@ -1571,12 +1863,12 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
         raw = await asyncio.wait_for(reader.readline(), timeout=3.0)
         if not raw:
             return
-        msg   = json.loads(raw.decode().strip())
+        msg = json.loads(raw.decode().strip())
         event = msg.get("event", "stop")
-        cwd   = msg.get("cwd", "")
-        proj  = _resolve_project_from_cwd(cwd, session_mgr)
+        cwd = msg.get("cwd", "")
+        proj = _resolve_project_from_cwd(cwd, session_mgr)
         print(f"[Hook] event={event}, cwd={cwd!r}, resolved_proj={proj!r}")
-        loop  = asyncio.get_event_loop()
+        loop = asyncio.get_event_loop()
 
         if event == "stop":
             text = (msg.get("text") or "").strip()
@@ -1593,19 +1885,22 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
 
         elif event == "pre_tool":
             tool = msg.get("tool", "")
-            cmd  = msg.get("command", "")
+            cmd = msg.get("command", "")
             print(f"[pre_tool] Received: tool={tool}, proj={proj!r}, cmd={cmd[:60]}")
             await _send({"type": "tool", "tool": tool, "command": cmd, "project": proj})
-            pw   = (session_mgr._perm_watchers.get(proj) or
-                    next(iter(session_mgr._perm_watchers.values()), None))
+            pw = session_mgr._perm_watchers.get(proj) or next(
+                iter(session_mgr._perm_watchers.values()), None
+            )
             if pw:
                 pw.arm_from_hook(tool, cmd, loop)
             else:
-                print(f"[pre_tool] No PermissionWatcher found for proj={proj!r}, "
-                      f"known={list(session_mgr._perm_watchers.keys())}")
+                print(
+                    f"[pre_tool] No PermissionWatcher found for proj={proj!r}, "
+                    f"known={list(session_mgr._perm_watchers.keys())}"
+                )
 
         elif event == "post_tool":
-            tool   = msg.get("tool", "")
+            tool = msg.get("tool", "")
             prefix = f"In {proj}: " if proj else ""
             if tool == "Bash":
                 exit_code = msg.get("exit_code", 0)
@@ -1615,9 +1910,9 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
                     await _speak_urgent(spoken)
             elif tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
                 file_path = msg.get("file_path", "")
-                basename  = os.path.basename(file_path) if file_path else "a file"
-                verb      = "wrote" if tool == "Write" else "edited"
-                spoken    = f"{prefix}Claude {verb} {basename}."
+                basename = os.path.basename(file_path) if file_path else "a file"
+                verb = "wrote" if tool == "Write" else "edited"
+                spoken = f"{prefix}Claude {verb} {basename}."
                 print(f"\n[PostTool] {spoken}")
                 await _speak_queue.put(("", spoken))
 
@@ -1634,28 +1929,37 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
             reason = "manual compact" if trigger == "manual" else "context window full"
             spoken = f"Memory compacting: {reason}."
             print(f"\n[PreCompact] {spoken} (proj={proj!r})")
-            await _send({"type": "status", "status": "compacting",
-                         "trigger": trigger, "project": proj})
+            await _send(
+                {
+                    "type": "status",
+                    "status": "compacting",
+                    "trigger": trigger,
+                    "project": proj,
+                }
+            )
             await _speak_queue.put((proj, spoken))
 
     except asyncio.TimeoutError:
         pass
-    except Exception as e:
-        print(f"[Brain] Hook handler error: {e}")
+    except Exception:
+        log.error("Hook handler error", exc_info=True)
     finally:
         try:
             writer.close()
             await writer.wait_closed()
         except Exception:
-            pass
+            log.debug("Hook writer cleanup failed", exc_info=True)
 
 
 # ── TCP server ─────────────────────────────────────────────────────────────────
 
-async def handle_voice_connection(reader: asyncio.StreamReader,
-                                   writer: asyncio.StreamWriter,
-                                   session_mgr: SessionManager,
-                                   loop: asyncio.AbstractEventLoop) -> None:
+
+async def handle_voice_connection(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    session_mgr: SessionManager,
+    loop: asyncio.AbstractEventLoop,
+) -> None:
     global _voice_writer
     addr = writer.get_extra_info("peername")
     print(f"[Brain] Voice service connected from {addr}")
@@ -1672,7 +1976,7 @@ async def handle_voice_connection(reader: asyncio.StreamReader,
     elif len(windows) == 1:
         greeting = f"Cyrus is online. Session: {_make_alias(windows[0][0])}."
     else:
-        names    = ", ".join(_make_alias(p) for p, _ in windows)
+        names = ", ".join(_make_alias(p) for p, _ in windows)
         greeting = f"Cyrus is online. {len(windows)} sessions: {names}."
 
     await _send({"type": "speak", "text": greeting, "project": ""})
@@ -1683,15 +1987,16 @@ async def handle_voice_connection(reader: asyncio.StreamReader,
         await voice_reader(reader, session_mgr, loop)
     finally:
         _voice_writer = None
-        print(f"[Brain] Voice service disconnected.")
+        print("[Brain] Voice service disconnected.")
         try:
             writer.close()
             await writer.wait_closed()
         except Exception:
-            pass
+            log.debug("Voice writer cleanup failed", exc_info=True)
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     global _speak_queue, _utterance_queue, _active_project
@@ -1701,9 +2006,9 @@ async def main() -> None:
     parser.add_argument("--port", type=int, default=BRAIN_PORT, help="Listen port")
     args = parser.parse_args()
 
-    _speak_queue     = asyncio.Queue()
+    _speak_queue = asyncio.Queue()
     _utterance_queue = asyncio.Queue()
-    loop             = asyncio.get_event_loop()
+    loop = asyncio.get_event_loop()
 
     # Session manager starts immediately — scans VS Code windows
     session_mgr = SessionManager()
@@ -1734,7 +2039,8 @@ async def main() -> None:
     # Voice TCP server (port 8766)
     voice_server = await asyncio.start_server(
         lambda r, w: handle_voice_connection(r, w, session_mgr, loop),
-        args.host, args.port,
+        args.host,
+        args.port,
     )
     addr = voice_server.sockets[0].getsockname()
     print(f"[Brain] Listening for voice service on {addr[0]}:{addr[1]}")
@@ -1742,18 +2048,22 @@ async def main() -> None:
     # Hook TCP server (port 8767) — Claude Code Stop hook connects here
     hook_server = await asyncio.start_server(
         lambda r, w: handle_hook_connection(r, w, session_mgr),
-        args.host, HOOK_PORT,
+        args.host,
+        HOOK_PORT,
     )
     hook_addr = hook_server.sockets[0].getsockname()
     print(f"[Brain] Listening for Claude hooks on {hook_addr[0]}:{hook_addr[1]}")
     # Mobile WebSocket server (port 8768)
     mobile_server = await websockets.serve(
         handle_mobile_ws,
-        args.host, MOBILE_PORT,
+        args.host,
+        MOBILE_PORT,
         ping_interval=None,
         ping_timeout=None,
     )
-    print(f"[Brain] Listening for mobile clients on {args.host}:{MOBILE_PORT} (WebSocket)")
+    print(
+        f"[Brain] Listening for mobile clients on {args.host}:{MOBILE_PORT} (WebSocket)"
+    )
     print("[Brain] Waiting for voice to connect...")
 
     async with voice_server, hook_server:

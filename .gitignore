@@ -7,3 +7,5 @@ __pycache__/
 *.bin
 tests/Recording_2.m4a
 tests/Recording.m4a
+.local/
+.barf/
