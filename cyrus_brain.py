@@ -88,6 +88,7 @@ _project_locked:      bool           = False
 _project_locked_lock: threading.Lock = threading.Lock()
 
 _conversation_active: bool = False
+_last_prompt_time:    float = 0.0   # timestamp of last prompt sent to mobile
 _whisper_prompt:      str  = "Cyrus,"
 _tts_active_remote:   bool = False   # True while voice service is playing TTS
 
@@ -199,6 +200,26 @@ def _strip_fillers(text: str) -> str:
 
 # ── Send to voice ──────────────────────────────────────────────────────────────
 
+async def _send_to_mobile(msg: dict) -> None:
+    """Broadcast one JSON message to mobile WebSocket clients only."""
+    if not _mobile_clients:
+        return
+    if msg.get("type") not in ("speak", "prompt", "thinking", "tool", "status",
+                                "permission_resolved"):
+        return
+    mobile_msg = dict(msg)
+    if "full_text" in mobile_msg:
+        mobile_msg["text"] = mobile_msg.pop("full_text")
+    payload = json.dumps(mobile_msg)
+    dead = set()
+    for ws in _mobile_clients.copy():
+        try:
+            await ws.send(payload)
+        except Exception:
+            dead.add(ws)
+    _mobile_clients.difference_update(dead)
+
+
 async def _send(msg: dict) -> None:
     """Send one JSON message to voice + mobile clients. Fire-and-forget."""
     # Sanitize text fields so TTS engines don't read raw UTF-8 bytes
@@ -215,18 +236,7 @@ async def _send(msg: dict) -> None:
         except Exception:
             _voice_writer = None
     # Broadcast to mobile WebSocket clients
-    if _mobile_clients and msg.get("type") in ("speak", "prompt", "thinking", "tool", "status"):
-        mobile_msg = dict(msg)
-        if "full_text" in mobile_msg:
-            mobile_msg["text"] = mobile_msg.pop("full_text")
-        payload = json.dumps(mobile_msg)
-        dead = set()
-        for ws in _mobile_clients.copy():
-            try:
-                await ws.send(payload)
-            except Exception:
-                dead.add(ws)
-        _mobile_clients.difference_update(dead)
+    await _send_to_mobile(msg)
 
 
 def _send_threadsafe(msg: dict, loop: asyncio.AbstractEventLoop) -> None:
@@ -250,10 +260,16 @@ async def _speak_worker() -> None:
 
 async def _speak_urgent(text: str) -> None:
     """Interrupt current TTS and speak immediately (e.g. permission dialogs)."""
-    # Drain the speak queue
+    # Drain the speak queue — but forward queued messages to mobile first
     while not _speak_queue.empty():
         try:
-            _speak_queue.get_nowait()
+            item = _speak_queue.get_nowait()
+            project, txt = item[0], item[1]
+            full_text = item[2] if len(item) > 2 else None
+            msg = {"type": "speak", "text": txt, "project": project}
+            if full_text:
+                msg["full_text"] = full_text
+            await _send_to_mobile(msg)
         except Exception:
             break
     await _send({"type": "stop_speech"})
@@ -873,7 +889,7 @@ class PermissionWatcher:
         _send_threadsafe({"type": "stop_speech"}, loop)
         asyncio.run_coroutine_threadsafe(_speak_urgent(prompt), loop)
 
-    def handle_response(self, text: str) -> bool:
+    def handle_response(self, text: str, loop: asyncio.AbstractEventLoop = None) -> bool:
         if not self._pending or not self._allow_btn:
             return False
         words = set(text.lower().strip().split())
@@ -899,6 +915,7 @@ class PermissionWatcher:
                     pyautogui.press("enter")
             self._pending   = False
             self._allow_btn = None
+            _send_threadsafe({"type": "permission_resolved", "action": "allowed"}, loop)
             return True
         if words & self.DENY_WORDS:
             print(f"[Brain] → Cancelling command ({self.project_name or 'session'})")
@@ -911,6 +928,7 @@ class PermissionWatcher:
             pyautogui.press("escape")
             self._pending   = False
             self._allow_btn = None
+            _send_threadsafe({"type": "permission_resolved", "action": "denied"}, loop)
             return True
         return False
 
@@ -997,6 +1015,7 @@ class PermissionWatcher:
                         if self._pending and time.time() > getattr(self, "_pending_since", 0) + 20:
                             self._pending   = False
                             self._allow_btn = None
+                            _send_threadsafe({"type": "permission_resolved", "action": "timeout"}, loop)
 
                     if p_ctrl and p_label != self._prompt_announced:
                         self._prompt_input_ctrl = p_ctrl
@@ -1011,6 +1030,7 @@ class PermissionWatcher:
                         if self._prompt_pending:
                             self._prompt_pending    = False
                             self._prompt_input_ctrl = None
+                            _send_threadsafe({"type": "permission_resolved", "action": "dismissed"}, loop)
 
                 except Exception:
                     self._chat_doc = None
@@ -1434,7 +1454,7 @@ async def routing_loop(session_mgr: SessionManager,
         handled = False
         for pw in session_mgr.perm_watchers:
             if pw.is_pending:
-                if pw.handle_response(text):
+                if pw.handle_response(text, loop):
                     handled = True
                     break
         if handled:
@@ -1542,6 +1562,8 @@ async def routing_loop(session_mgr: SessionManager,
                 await _send({"type": "chime"})
                 await _send({"type": "prompt", "text": raw_msg, "project": proj or ""})
                 await _send({"type": "thinking"})
+                global _last_prompt_time
+                _last_prompt_time = time.time()
             _conversation_active = False
 
 
@@ -1582,6 +1604,10 @@ async def handle_hook_connection(reader: asyncio.StreamReader,
             text = (msg.get("text") or "").strip()
             if not text:
                 return
+            # If no prompt was sent recently, the user typed directly in VS Code —
+            # send a retroactive prompt to mobile so it sees the conversation.
+            if time.time() - _last_prompt_time > 60:
+                await _send_to_mobile({"type": "prompt", "text": "(typed in VS Code)", "project": proj or ""})
             spoken = clean_for_speech(text)
             cw = session_mgr._chat_watchers.get(proj)
             if cw:
