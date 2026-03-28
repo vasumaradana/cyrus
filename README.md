@@ -101,14 +101,14 @@ Download the two zip packages from [Releases](../../releases):
 
 ```powershell
 # Windows
-Expand-Archive cyrus-brain-0.1.2.zip -DestinationPath cyrus-brain
+Expand-Archive cyrus-brain-0.1.3.zip -DestinationPath cyrus-brain
 cd cyrus-brain
 powershell -ExecutionPolicy Bypass -File install-brain.ps1
 ```
 
 ```bash
 # macOS / Linux
-unzip cyrus-brain-0.1.2.zip -d cyrus-brain
+unzip cyrus-brain-0.1.3.zip -d cyrus-brain
 cd cyrus-brain
 bash install-brain.sh
 ```
@@ -126,14 +126,14 @@ The installer handles everything automatically:
 
 ```powershell
 # Windows
-Expand-Archive cyrus-voice-0.1.2.zip -DestinationPath cyrus-voice
+Expand-Archive cyrus-voice-0.1.3.zip -DestinationPath cyrus-voice
 cd cyrus-voice
 powershell -ExecutionPolicy Bypass -File install-voice.ps1 -BrainHost <brain-ip>
 ```
 
 ```bash
 # macOS / Linux
-unzip cyrus-voice-0.1.2.zip -d cyrus-voice
+unzip cyrus-voice-0.1.3.zip -d cyrus-voice
 cd cyrus-voice
 bash install-voice.sh --brain-host <brain-ip>
 ```
@@ -153,6 +153,19 @@ start-brain.bat          # or ./start-brain.sh
 start-voice.bat          # or ./start-voice.sh
 ```
 
+### 3. Mobile App (optional)
+
+The Cyrus mobile app connects to the Brain over WebSocket for remote monitoring and control.
+
+- View per-session message history with session tabs
+- Approve/deny permission prompts remotely
+- Send text commands to any session
+- System notifications for permission prompts when app is backgrounded
+
+Install the APK from [Releases](../../releases) on Android. Configure the Brain IP in Settings.
+
+The Brain listens for mobile clients on **port 8769** (WebSocket).
+
 ## Networking
 
 Voice connects to Brain on **port 8766** (TCP). Both machines must be reachable.
@@ -163,7 +176,7 @@ Voice connects to Brain on **port 8766** (TCP). Both machines must be reachable.
 | **LAN / ZeroTier / Tailscale** | `--host <brain-ip>` when starting voice |
 | **Remote** | Ensure port 8766 is reachable (VPN or tunnel) |
 
-Brain also listens on **port 8767** for Claude Code hooks (local only).
+Brain also listens on **port 8767** for Claude Code hooks (local only) and **port 8769** for mobile clients (WebSocket).
 
 ## Voice Commands
 
@@ -202,10 +215,10 @@ All 4 hook events are configured automatically by the brain installer:
 ## Building Release Packages
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build-release.ps1 -Version 0.1.2
+powershell -ExecutionPolicy Bypass -File build-release.ps1 -Version 0.1.3
 ```
 
-Creates `dist/cyrus-voice-0.1.2.zip` and `dist/cyrus-brain-0.1.2.zip`.
+Creates `dist/cyrus-voice-0.1.3.zip` and `dist/cyrus-brain-0.1.3.zip`.
 
 ## Requirements
 

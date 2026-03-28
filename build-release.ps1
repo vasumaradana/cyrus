@@ -1,9 +1,9 @@
-# Cyrus — Build Release Packages
+# Cyrus - Build Release Packages
 # Run: powershell -ExecutionPolicy Bypass -File build-release.ps1
 #
 # Creates two zip files in dist/:
-#   cyrus-voice-<version>.zip  — Voice service (runs anywhere)
-#   cyrus-brain-<version>.zip  — Brain + Hook + Companion (runs on dev machine)
+#   cyrus-voice-<version>.zip  - Voice service (runs anywhere)
+#   cyrus-brain-<version>.zip  - Brain + Hook + Companion (runs on dev machine)
 
 param(
     [string]$Version = "0.1.0"
@@ -27,12 +27,12 @@ try {
     npx @vscode/vsce package --no-dependencies 2>&1 | Write-Host
     $VsixCheck = Get-ChildItem "*.vsix" -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $VsixCheck) {
-        Write-Host "  WARNING: .vsix was not produced — extension will be missing from release" -ForegroundColor Red
+        Write-Host "  WARNING: .vsix was not produced - extension will be missing from release" -ForegroundColor Red
     } else {
         Write-Host "  Built: $($VsixCheck.Name)" -ForegroundColor Green
     }
 } catch {
-    Write-Host "  WARNING: Extension build failed — $_" -ForegroundColor Red
+    Write-Host "  WARNING: Extension build failed - $_" -ForegroundColor Red
 }
 Pop-Location
 
@@ -87,7 +87,7 @@ if ($VsixFile) {
     Copy-Item $VsixFile.FullName "$BrainStage\" -Force
     Write-Host "       Included: $($VsixFile.Name)"
 } else {
-    Write-Host "  WARNING: No .vsix found — brain package will ship without companion extension!" -ForegroundColor Red
+    Write-Host "  WARNING: No .vsix found - brain package will ship without companion extension!" -ForegroundColor Red
 }
 
 Compress-Archive -Path "$BrainStage\*" -DestinationPath "$DistDir\cyrus-brain-$Version.zip" -Force
